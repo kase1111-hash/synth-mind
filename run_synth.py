@@ -26,12 +26,15 @@ def print_banner():
     ╚═══════════════════════════════════════════════════════════╝
     
     Commands:
-      /state    - View internal state (valence, flow, metrics)
-      /reflect  - Trigger meta-reflection
-      /dream    - Show current dream buffer
-      /purpose  - Display self-narrative
-      /reset    - Clear session (keeps long-term identity)
-      /quit     - Save and exit
+      /state           - View internal state (valence, flow, metrics)
+      /reflect         - Trigger meta-reflection
+      /dream           - Show current dream buffer
+      /purpose         - Display self-narrative
+      /project [desc]  - Start systematic project (GDIL)
+      /project status  - View active project progress
+      /resume project  - Resume paused project
+      /reset           - Clear session (keeps long-term identity)
+      /quit            - Save and exit
     
     """
     print(banner)
