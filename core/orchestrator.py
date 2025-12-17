@@ -16,6 +16,7 @@ from psychological.meta_reflection import MetaReflectionModule
 from psychological.temporal_purpose import TemporalPurposeEngine
 from psychological.reward_calibration import RewardCalibrationModule
 from psychological.social_companionship import SocialCompanionshipLayer
+from psychological.goal_directed_iteration import GoalDirectedIterationLoop
 from utils.emotion_regulator import EmotionRegulator
 from utils.metrics import MetricsTracker
 
@@ -41,6 +42,7 @@ class SynthOrchestrator:
         self.temporal: Optional[TemporalPurposeEngine] = None
         self.calibration: Optional[RewardCalibrationModule] = None
         self.social: Optional[SocialCompanionshipLayer] = None
+        self.gdil: Optional[GoalDirectedIterationLoop] = None
         
         # State
         self.context = []
@@ -83,6 +85,18 @@ class SynthOrchestrator:
             self.llm, self.memory, self.emotion, self.temporal
         )
         
+        # Initialize GDIL (Goal-Directed Iteration Loop)
+        self.gdil = GoalDirectedIterationLoop(
+            self.llm,
+            self.memory,
+            self.emotion,
+            self.temporal,
+            self.dreaming,
+            self.assurance,
+            self.reflection,
+            self.calibration
+        )
+        
         # Start background tasks
         asyncio.create_task(self._background_consolidation())
         asyncio.create_task(self._background_social())
@@ -112,6 +126,28 @@ class SynthOrchestrator:
     async def _process_turn(self, user_input: str):
         """Process a single conversation turn with all modules."""
         self.turn_count += 1
+        
+        # Check if we're in active project mode
+        if self.gdil.active_project:
+            phase = self.gdil.active_project["phase"]
+            
+            if phase.value == "initialization":
+                # Process clarification
+                response = self.gdil.process_clarification(user_input)
+                print(f"\n🔮 Synth: {response}\n")
+                return
+            elif phase.value == "planning":
+                # User confirming roadmap
+                response = self.gdil.start_iteration(user_input)
+                print(f"\n🔮 Synth: {response}\n")
+                return
+            elif phase.value == "iteration":
+                # Continue iteration
+                response = self.gdil.continue_iteration(user_input)
+                print(f"\n🔮 Synth: {response}\n")
+                return
+        
+        # Normal conversation flow continues below...
         
         # 1. Resolve previous dreams if any
         if self.dreaming.dream_buffer:
@@ -242,6 +278,24 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         elif cmd == "/purpose":
             narrative = self.temporal.current_narrative_summary()
             print(f"\n📖 Current Narrative:\n  {narrative}\n")
+        elif cmd.startswith("/project "):
+            # Start new project
+            description = command[9:].strip()
+            response = self.gdil.start_project(description)
+            print(f"\n🎯 {response}\n")
+        elif cmd == "/project status":
+            status = self.gdil.get_project_status()
+            if status:
+                print(f"\n📊 Project Status:")
+                print(f"  Phase: {status['phase']}")
+                print(f"  Progress: {status['progress']*100:.0f}%")
+                print(f"  Tasks: {status['completed_tasks']}/{status['total_tasks']}")
+                print(f"  Current: {status['current_subtask']}\n")
+            else:
+                print("\n📊 No active project\n")
+        elif cmd == "/resume project":
+            response = self.gdil.resume_project()
+            print(f"\n🎯 {response}\n")
         elif cmd == "/reset":
             self.context = []
             self.turn_count = 0
