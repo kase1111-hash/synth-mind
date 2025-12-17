@@ -5,6 +5,7 @@ Runs both CLI interface and web dashboard simultaneously.
 """
 
 import asyncio
+import os
 import sys
 import webbrowser
 from pathlib import Path
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.orchestrator import SynthOrchestrator
 from utils.logging import setup_logging
+from utils.ollama_setup import prompt_ollama_setup
 
 # Import dashboard server
 try:
@@ -266,11 +268,39 @@ async def main():
     """Main entry point."""
     setup_logging()
     print_banner()
-    
+
     # Initialize orchestrator
     try:
         orchestrator = DashboardIntegratedOrchestrator()
         await orchestrator.initialize()
+    except ValueError as e:
+        # Check if it's the "No LLM provider" error
+        if "No LLM provider configured" in str(e):
+            # Offer to set up Ollama
+            success, model_name = prompt_ollama_setup()
+
+            if success and model_name:
+                # Set environment variable and retry
+                os.environ["OLLAMA_MODEL"] = model_name
+                print(f"\n✅ Using Ollama with model: {model_name}")
+                print("Restarting Synth Mind...\n")
+
+                try:
+                    orchestrator = DashboardIntegratedOrchestrator()
+                    await orchestrator.initialize()
+                except Exception as retry_error:
+                    print(f"❌ Failed to initialize after setup: {retry_error}")
+                    sys.exit(1)
+            else:
+                print("\n❌ Cannot start without LLM provider.")
+                print("\nOptions:")
+                print("  1. Set API key: export ANTHROPIC_API_KEY='your-key'")
+                print("  2. Set API key: export OPENAI_API_KEY='your-key'")
+                print("  3. Install Ollama: https://ollama.com")
+                sys.exit(1)
+        else:
+            print(f"❌ Failed to initialize: {e}")
+            sys.exit(1)
     except Exception as e:
         print(f"❌ Failed to initialize: {e}")
         sys.exit(1)
