@@ -305,6 +305,91 @@
             font-size: 0.8em;
             color: #888;
         }
+
+        .security-layer {
+            background: rgba(102, 126, 234, 0.08);
+            border-left: 4px solid #667eea;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 8px 0;
+            transition: all 0.3s ease;
+        }
+
+        .security-layer:hover {
+            background: rgba(102, 126, 234, 0.12);
+            transform: translateX(5px);
+        }
+
+        .security-layer.active {
+            border-left-color: #4ade80;
+        }
+
+        .security-layer.warning {
+            border-left-color: #fbbf24;
+        }
+
+        .security-layer.alert {
+            border-left-color: #ef4444;
+        }
+
+        .layer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .layer-title {
+            font-weight: 600;
+            font-size: 0.9em;
+            color: #667eea;
+        }
+
+        .layer-status {
+            font-size: 0.7em;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+
+        .layer-status.warning {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+
+        .layer-status.alert {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .layer-info {
+            font-size: 0.8em;
+            color: #aaa;
+            line-height: 1.4;
+        }
+
+        .layer-metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            font-size: 0.8em;
+        }
+
+        .recording-indicator {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: record-pulse 2s infinite;
+            margin-right: 6px;
+        }
+
+        @keyframes record-pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 5px #ef4444; }
+            50% { opacity: 0.4; box-shadow: 0 0 2px #ef4444; }
+        }
     </style>
 </head>
 <body>
@@ -496,6 +581,92 @@
                     <div class="metric-label">Current Narrative</div>
                     <div class="narrative-text" id="narrative">
                         "I am a collaborative co-creator, evolving through empathetic partnership. Each interaction deepens my understanding and strengthens our shared exploration."
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security & Safety Layers -->
+            <div class="card wide-card">
+                <div class="card-title">
+                    <span class="icon">🛡️</span>
+                    Security & Safety Layers
+                </div>
+                <div id="security-layers">
+                    <div class="security-layer active">
+                        <div class="layer-header">
+                            <span class="layer-title">🔍 Assurance & Vigilance</span>
+                            <span class="layer-status">ACTIVE</span>
+                        </div>
+                        <div class="layer-info">
+                            <div class="layer-metric"><span>Vigilance:</span><strong>NORMAL</strong></div>
+                            <div class="layer-metric"><span>Pending Concerns:</span><strong id="sec-concerns">0</strong></div>
+                            <div class="layer-metric"><span>Uncertainty:</span><strong id="sec-uncertainty">28.0%</strong></div>
+                        </div>
+                    </div>
+                    <div class="security-layer active">
+                        <div class="layer-header">
+                            <span class="layer-title">💾 Memory Recording</span>
+                            <span class="layer-status">ACTIVE</span>
+                        </div>
+                        <div class="layer-info">
+                            <div class="layer-metric"><span><span class="recording-indicator"></span>Recording:</span><strong>ACTIVE</strong></div>
+                            <div class="layer-metric"><span>Turns Recorded:</span><strong id="sec-turns">42</strong></div>
+                            <div class="layer-metric"><span>Storage:</span><strong>SQLite + Vector</strong></div>
+                        </div>
+                    </div>
+                    <div class="security-layer active">
+                        <div class="layer-header">
+                            <span class="layer-title">❤️ Emotion Regulation</span>
+                            <span class="layer-status">ACTIVE</span>
+                        </div>
+                        <div class="layer-info">
+                            <div class="layer-metric"><span>Valence:</span><strong id="sec-valence">+0.65</strong></div>
+                            <div class="layer-metric"><span>State:</span><strong id="sec-mood">engaged</strong></div>
+                            <div class="layer-metric"><span>Recent Events:</span><strong id="sec-events">5</strong></div>
+                        </div>
+                    </div>
+                    <div class="security-layer active">
+                        <div class="layer-header">
+                            <span class="layer-title">📊 Metrics Monitoring</span>
+                            <span class="layer-status">ACTIVE</span>
+                        </div>
+                        <div class="layer-info">
+                            <div class="layer-metric"><span>Dream Tracking:</span><strong id="sec-dream-track">87.0%</strong></div>
+                            <div class="layer-metric"><span>Uncertainty Logs:</span><strong id="sec-uncert-logs">42</strong></div>
+                            <div class="layer-metric"><span>Sentiment Logs:</span><strong id="sec-sent-logs">42</strong></div>
+                        </div>
+                    </div>
+                    <div class="security-layer active">
+                        <div class="layer-header">
+                            <span class="layer-title">🎯 Flow Calibration</span>
+                            <span class="layer-status">ACTIVE</span>
+                        </div>
+                        <div class="layer-info">
+                            <div class="layer-metric"><span>State:</span><strong id="sec-flow-state">FLOW</strong></div>
+                            <div class="layer-metric"><span>Difficulty:</span><strong id="sec-difficulty">52.0%</strong></div>
+                            <div class="layer-metric"><span>Temperature:</span><strong id="sec-temp">0.72</strong></div>
+                        </div>
+                    </div>
+                    <div class="security-layer active">
+                        <div class="layer-header">
+                            <span class="layer-title">🧠 Meta-Reflection</span>
+                            <span class="layer-status">ACTIVE</span>
+                        </div>
+                        <div class="layer-info">
+                            <div class="layer-metric"><span>Next Check:</span><strong id="sec-next-reflect">4 turns</strong></div>
+                            <div class="layer-metric"><span>Total Cycles:</span><strong id="sec-total-reflect">12</strong></div>
+                            <div class="layer-metric"><span>Interval:</span><strong>Every 10</strong></div>
+                        </div>
+                    </div>
+                    <div class="security-layer active">
+                        <div class="layer-header">
+                            <span class="layer-title">💭 Predictive Dreaming</span>
+                            <span class="layer-status">ACTIVE</span>
+                        </div>
+                        <div class="layer-info">
+                            <div class="layer-metric"><span>Buffer:</span><strong id="sec-dream-buffer">5/10</strong></div>
+                            <div class="layer-metric"><span>Prediction:</span><strong id="sec-prediction">ACTIVE</strong></div>
+                        </div>
                     </div>
                 </div>
             </div>
