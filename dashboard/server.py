@@ -45,6 +45,7 @@ class DashboardServer:
         self.app.router.add_get('/api/state', self.get_state)
         self.app.router.add_post('/api/simulate', self.simulate_turn)
         self.app.router.add_post('/api/reflect', self.trigger_reflection)
+        self.app.router.add_post('/api/generate', self.peer_generate)
         
         # Enable CORS
         cors = aiohttp_cors.setup(self.app, defaults={
@@ -126,12 +127,47 @@ class DashboardServer:
             self.orchestrator.emotion.current_state(),
             self.orchestrator._gather_metrics()
         )
-        
+
         # Broadcast updated state
         await self.broadcast_state()
-        
+
         if request:
             return web.json_response({"success": True, "result": result})
+
+    async def peer_generate(self, request):
+        """
+        Peer-to-peer generation endpoint for social companionship.
+        Compatible with the social companionship layer's expected API format.
+        """
+        try:
+            data = await request.json()
+            prompt = data.get('prompt', '')
+            temperature = data.get('temperature', 0.85)
+            max_tokens = data.get('max_tokens', 150)
+
+            if not prompt:
+                return web.json_response(
+                    {"error": "No prompt provided"},
+                    status=400
+                )
+
+            # Generate response using the orchestrator's LLM
+            response_text = await self.orchestrator.llm.generate(
+                prompt=prompt,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
+            return web.json_response({
+                "response": response_text.strip(),
+                "success": True
+            })
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
     
     def gather_state(self) -> dict:
         """Gather complete internal state."""
