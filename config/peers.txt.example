@@ -1,0 +1,28 @@
+# Peer Endpoints Configuration
+#
+# This file contains URLs of other synth-mind instances for peer-to-peer communication.
+# Each line should be a complete URL to the /api/generate endpoint of another instance.
+#
+# Format: http://hostname:port/api/generate
+#
+# Example for local testing (9 instances on ports 8080-8088):
+# http://localhost:8081/api/generate
+# http://localhost:8082/api/generate
+# http://localhost:8083/api/generate
+# http://localhost:8084/api/generate
+# http://localhost:8085/api/generate
+# http://localhost:8086/api/generate
+# http://localhost:8087/api/generate
+# http://localhost:8088/api/generate
+#
+# Example for network deployment:
+# http://synth-instance-1.example.com:8080/api/generate
+# http://synth-instance-2.example.com:8080/api/generate
+# http://synth-instance-3.example.com:8080/api/generate
+#
+# Note: Do not include this instance's own endpoint in the list
+# Note: The social companionship layer will randomly select peers when idle
+# Note: No user data is ever shared - only abstract topics and insights
+#
+# Uncomment and modify the examples below for your setup:
+
