@@ -160,13 +160,30 @@ def prompt_ollama_setup() -> Tuple[bool, Optional[str]]:
     print("  3. Use OpenAI GPT (API key required)")
     print()
 
+    # Check if running in non-interactive environment
+    import sys
+    if not sys.stdin.isatty():
+        print("⚠️  Running in non-interactive mode.")
+        print("\nTo use Synth Mind, please set one of these environment variables:")
+        print("  export ANTHROPIC_API_KEY='your-key'")
+        print("  export OPENAI_API_KEY='your-key'")
+        print("  export OLLAMA_MODEL='llama3.2'  # if Ollama is installed")
+        print("\nOr run from an interactive terminal.")
+        return False, None
+
     # Check if Ollama is already installed
     ollama_installed = check_ollama_installed()
 
     if not ollama_installed:
         print("Ollama is not installed on this system.")
         print()
-        choice = input("Would you like to install Ollama? (y/n): ").strip().lower()
+        try:
+            choice = input("Would you like to install Ollama? (y/n): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\n\n⚠️  Interactive input not available.")
+            print("Set an environment variable instead:")
+            print("  export ANTHROPIC_API_KEY='your-key'")
+            return False, None
 
         if choice != 'y':
             print("\nTo use Synth Mind, you can:")
