@@ -30,7 +30,8 @@ print("=" * 60)
 dashboard_files = {
     "run_synth_with_dashboard.py": Path("dashboard/run_synth_with_dashboard.py"),
     "server.py": Path("dashboard/server.py"),
-    "Dashboard (HTML)": Path("dashboard/Dashboard"),
+    "dashboard.html": Path("dashboard/dashboard.html"),
+    "timeline.html": Path("dashboard/timeline.html"),
     "README_DASHBOARD.md": Path("dashboard/README_DASHBOARD.md"),
     "DASHBOARD_COMPLETE.md": Path("dashboard/DASHBOARD_COMPLETE.md"),
 }
@@ -131,7 +132,7 @@ print("\n" + "=" * 60)
 print("TEST 7: Dashboard HTML")
 print("=" * 60)
 
-dashboard_html = (original_dir / "dashboard/Dashboard").read_text()
+dashboard_html = (original_dir / "dashboard/dashboard.html").read_text()
 
 html_checks = {
     "HTML5 doctype": "<!DOCTYPE html>",

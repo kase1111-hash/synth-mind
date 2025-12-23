@@ -1,8 +1,8 @@
 # Synth Mind — Technical Specification Sheet
 
-> **Version:** 1.3
+> **Version:** 1.4
 > **Last Updated:** 2024-12-23
-> **Status:** Core Complete — Production Ready (JWT Auth Enabled)
+> **Status:** Core Complete — Production Ready (JWT Auth + Gantt Charts)
 
 ---
 
@@ -26,6 +26,7 @@
 | Project Templates | ✅ Complete | 10 built-in templates with roadmaps |
 | Collaborative Projects | ✅ Complete | Multi-agent project collaboration |
 | JWT Authentication | ✅ Complete | Production-ready auth with roles |
+| Visual Timeline/Gantt | ✅ Complete | Interactive project visualization |
 
 ### Detailed Component Status
 
@@ -83,13 +84,14 @@
 | JWT Authentication | `utils/auth.py` | Full auth module with roles (350+ lines) |
 | Auth Middleware | `dashboard/server.py` | Protected routes with token validation |
 | User Management API | `dashboard/server.py` | Create, delete, update users (admin only) |
+| Timeline/Gantt Page | `dashboard/timeline.html` | Interactive Gantt chart visualization |
+| Timeline API | `dashboard/server.py` | `/timeline`, `/api/timeline` endpoints |
 
 #### ❌ Not Implemented (Design/Roadmap Only)
 
 | Feature | Documentation | Notes |
 |---------|---------------|-------|
 | Voice Interface | README roadmap | Whisper + TTS not integrated |
-| Visual Timeline/Gantt | GDIL_COMPLETE.md | Not implemented |
 | Version Control Integration | GDIL_COMPLETE.md | No Git integration |
 
 ---
@@ -514,6 +516,81 @@ Multiple synth-mind instances can collaborate on shared projects.
 
 ---
 
+## Visual Timeline & Gantt Charts
+
+**Status:** ✅ Implemented
+**File:** `dashboard/timeline.html`
+
+### Overview
+
+Interactive project visualization with Gantt-style charts for tracking GDIL and collaborative project progress.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Gantt Bars | Color-coded task bars showing status |
+| Multi-Project View | View all projects or filter by project |
+| Task Tooltips | Hover for task details (priority, dependencies, progress) |
+| Zoom Controls | Zoom in/out on timeline |
+| Auto-Refresh | Updates every 10 seconds |
+| Collaborative Support | Shows both GDIL and collaborative projects |
+
+### Task Status Colors
+
+| Status | Color | Description |
+|--------|-------|-------------|
+| Completed | Green | Task finished successfully |
+| In Progress | Purple (pulsing) | Currently being worked on |
+| Pending | Gray | Not yet started |
+| Pending Review | Yellow | Awaiting review |
+| Blocked | Red | Has blockers |
+
+### Access
+
+| Route | Description |
+|-------|-------------|
+| `/timeline` | Timeline visualization page |
+| `/api/timeline` | JSON API for project data |
+
+### API Response
+
+```json
+GET /api/timeline
+{
+  "success": true,
+  "projects": [
+    {
+      "id": "project_123",
+      "name": "My Project",
+      "phase": "iteration",
+      "roadmap": [
+        {
+          "id": "task_1",
+          "name": "Task Name",
+          "status": "completed",
+          "priority": 1,
+          "dependencies": [],
+          "progress": 1.0
+        }
+      ],
+      "progress": 0.75,
+      "is_collaborative": false
+    }
+  ],
+  "total_projects": 1
+}
+```
+
+### Usage
+
+1. Navigate to `http://localhost:8080/timeline`
+2. Select a project from dropdown or view all
+3. Hover over task bars for details
+4. Use zoom controls for timeline scaling
+
+---
+
 ## Multi-Instance Peer Network
 
 ### Architecture
@@ -868,6 +945,8 @@ synth-mind/
 │
 ├── dashboard/
 │   ├── server.py                   # WebSocket server
+│   ├── dashboard.html              # Main dashboard page
+│   ├── timeline.html               # Gantt chart visualization
 │   ├── README_DASHBOARD.md         # Dashboard docs
 │   └── DASHBOARD_COMPLETE.md       # Dashboard spec
 │
@@ -1011,10 +1090,10 @@ curl http://localhost:8080/api/state \
 - [x] Project templates library (10 built-in templates)
 - [x] Collaborative multi-agent projects (task claiming, sync, roles)
 - [x] JWT authentication for production (role-based access control)
+- [x] Visual timeline/Gantt charts (interactive project visualization)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS
-- [ ] Visual timeline/Gantt charts
 - [ ] Version control integration
 - [ ] Cloud-hosted dashboards
 - [ ] HTTPS/WSS encryption
