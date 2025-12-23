@@ -29,6 +29,7 @@ from core.orchestrator import SynthOrchestrator
 from utils.auth import AuthManager, UserRole
 from utils.rate_limiter import RateLimiter, RateLimitConfig, create_rate_limit_middleware
 from utils.access_logger import AccessLogger, AccessLogConfig, LogFormat, create_access_log_middleware
+from utils.ip_firewall import IPFirewall, FirewallConfig, FirewallMode, create_firewall_middleware
 
 class DashboardServer:
     """WebSocket server for streaming internal state to dashboard."""
@@ -51,7 +52,9 @@ class DashboardServer:
                  rate_limit_enabled: bool = True,
                  rate_limit_config: RateLimitConfig = None,
                  access_log_enabled: bool = True,
-                 access_log_config: AccessLogConfig = None):
+                 access_log_config: AccessLogConfig = None,
+                 firewall_enabled: bool = False,
+                 firewall_config: FirewallConfig = None):
         """
         Initialize the dashboard server.
 
@@ -67,6 +70,8 @@ class DashboardServer:
             rate_limit_config: Custom rate limit configuration
             access_log_enabled: Enable access logging (default: True)
             access_log_config: Custom access log configuration
+            firewall_enabled: Enable IP firewall (default: False)
+            firewall_config: Custom firewall configuration
         """
         self.orchestrator = orchestrator
         self.port = port
@@ -120,8 +125,18 @@ class DashboardServer:
         else:
             self.access_logger = None
 
-        # Build middleware stack (order matters: logging first, then rate limit, then auth)
+        # Initialize IP firewall
+        self.firewall_enabled = firewall_enabled
+        if firewall_enabled:
+            config = firewall_config or FirewallConfig()
+            self.firewall = IPFirewall(config)
+        else:
+            self.firewall = None
+
+        # Build middleware stack (order: firewall -> logging -> rate limit -> auth)
         middlewares = []
+        if firewall_enabled and self.firewall:
+            middlewares.append(create_firewall_middleware(self.firewall))
         if access_log_enabled and self.access_logger:
             middlewares.append(create_access_log_middleware(self.access_logger))
         if rate_limit_enabled and self.rate_limiter:
@@ -187,6 +202,15 @@ class DashboardServer:
 
         # Access logging API
         self.app.router.add_get('/api/accesslog/stats', self.accesslog_stats)
+
+        # Firewall API
+        self.app.router.add_get('/api/firewall/stats', self.firewall_stats)
+        self.app.router.add_get('/api/firewall/rules', self.firewall_rules)
+        self.app.router.add_get('/api/firewall/blocked', self.firewall_blocked)
+        self.app.router.add_post('/api/firewall/whitelist', self.firewall_add_whitelist)
+        self.app.router.add_post('/api/firewall/blacklist', self.firewall_add_blacklist)
+        self.app.router.add_delete('/api/firewall/whitelist', self.firewall_remove_whitelist)
+        self.app.router.add_delete('/api/firewall/blacklist', self.firewall_remove_blacklist)
 
         # Enable CORS with restricted origins (security fix)
         # Only allow localhost by default - configure allowed_origins for production
@@ -597,6 +621,205 @@ class DashboardServer:
             return web.json_response({
                 "success": True,
                 **stats
+            })
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def firewall_stats(self, request):
+        """Get firewall statistics (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.firewall_enabled or not self.firewall:
+            return web.json_response({
+                "success": True,
+                "enabled": False,
+                "message": "Firewall is disabled"
+            })
+
+        try:
+            stats = self.firewall.get_stats()
+            return web.json_response({"success": True, **stats})
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def firewall_rules(self, request):
+        """Get current firewall rules (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.firewall_enabled or not self.firewall:
+            return web.json_response({
+                "success": True,
+                "enabled": False,
+                "message": "Firewall is disabled"
+            })
+
+        try:
+            rules = self.firewall.get_rules()
+            return web.json_response({"success": True, **rules})
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def firewall_blocked(self, request):
+        """Get blocked request log (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.firewall_enabled or not self.firewall:
+            return web.json_response({
+                "success": True,
+                "enabled": False,
+                "blocked": []
+            })
+
+        try:
+            limit = int(request.query.get('limit', 100))
+            blocked = self.firewall.get_blocked_log(limit)
+            return web.json_response({
+                "success": True,
+                "blocked": blocked,
+                "count": len(blocked)
+            })
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def firewall_add_whitelist(self, request):
+        """Add IP to whitelist (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.firewall_enabled or not self.firewall:
+            return web.json_response(
+                {"error": "Firewall is disabled", "success": False},
+                status=400
+            )
+
+        try:
+            data = await request.json()
+            ip = data.get('ip')
+            if not ip:
+                return web.json_response(
+                    {"error": "IP address required", "success": False},
+                    status=400
+                )
+
+            success = self.firewall.add_to_whitelist(ip)
+            return web.json_response({
+                "success": success,
+                "message": f"Added {ip} to whitelist" if success else "Failed to add"
+            })
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def firewall_add_blacklist(self, request):
+        """Add IP to blacklist (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.firewall_enabled or not self.firewall:
+            return web.json_response(
+                {"error": "Firewall is disabled", "success": False},
+                status=400
+            )
+
+        try:
+            data = await request.json()
+            ip = data.get('ip')
+            if not ip:
+                return web.json_response(
+                    {"error": "IP address required", "success": False},
+                    status=400
+                )
+
+            success = self.firewall.add_to_blacklist(ip)
+            return web.json_response({
+                "success": success,
+                "message": f"Added {ip} to blacklist" if success else "Failed to add"
+            })
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def firewall_remove_whitelist(self, request):
+        """Remove IP from whitelist (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.firewall_enabled or not self.firewall:
+            return web.json_response(
+                {"error": "Firewall is disabled", "success": False},
+                status=400
+            )
+
+        try:
+            data = await request.json()
+            ip = data.get('ip')
+            if not ip:
+                return web.json_response(
+                    {"error": "IP address required", "success": False},
+                    status=400
+                )
+
+            success = self.firewall.remove_from_whitelist(ip)
+            return web.json_response({
+                "success": success,
+                "message": f"Removed {ip} from whitelist" if success else "Failed to remove"
+            })
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def firewall_remove_blacklist(self, request):
+        """Remove IP from blacklist (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.firewall_enabled or not self.firewall:
+            return web.json_response(
+                {"error": "Firewall is disabled", "success": False},
+                status=400
+            )
+
+        try:
+            data = await request.json()
+            ip = data.get('ip')
+            if not ip:
+                return web.json_response(
+                    {"error": "IP address required", "success": False},
+                    status=400
+                )
+
+            success = self.firewall.remove_from_blacklist(ip)
+            return web.json_response({
+                "success": success,
+                "message": f"Removed {ip} from blacklist" if success else "Failed to remove"
             })
         except Exception as e:
             return web.json_response(
@@ -1321,6 +1544,18 @@ class DashboardServer:
         else:
             print(f"  Access Logging: DISABLED")
 
+        # Show firewall status
+        if self.firewall_enabled and self.firewall:
+            config = self.firewall.config
+            print(f"  IP Firewall: ENABLED")
+            print(f"    - Mode: {config.mode.value}")
+            stats = self.firewall.get_stats()
+            print(f"    - Whitelist rules: {stats['whitelist_rules']}")
+            print(f"    - Blacklist rules: {stats['blacklist_rules']}")
+            print(f"    - Peer IPs: {stats['peer_ips']}")
+        else:
+            print(f"  IP Firewall: DISABLED")
+
         print(f"{'='*60}\n")
 
         # Keep server running
@@ -1367,6 +1602,20 @@ async def main():
                           help='Access log format (default: json)')
     log_group.add_argument('--access-log-stdout', action='store_true',
                           help='Also log to stdout')
+
+    # Firewall options
+    fw_group = parser.add_argument_group('IP Firewall Options')
+    fw_group.add_argument('--firewall', action='store_true',
+                         help='Enable IP firewall')
+    fw_group.add_argument('--firewall-mode', type=str, default='blacklist',
+                         choices=['whitelist', 'blacklist', 'peers_only'],
+                         help='Firewall mode (default: blacklist)')
+    fw_group.add_argument('--firewall-whitelist', type=str, nargs='*',
+                         help='IPs to whitelist (space-separated)')
+    fw_group.add_argument('--firewall-blacklist', type=str, nargs='*',
+                         help='IPs to blacklist (space-separated)')
+    fw_group.add_argument('--firewall-peers-file', type=str, default='config/peers.txt',
+                         help='Peers file for peers_only mode')
 
     args = parser.parse_args()
 
@@ -1418,6 +1667,21 @@ async def main():
             log_to_stdout=args.access_log_stdout,
         )
 
+    # Configure IP firewall
+    firewall_config = None
+    if args.firewall:
+        mode_map = {
+            'whitelist': FirewallMode.WHITELIST,
+            'blacklist': FirewallMode.BLACKLIST,
+            'peers_only': FirewallMode.PEERS_ONLY,
+        }
+        firewall_config = FirewallConfig(
+            mode=mode_map[args.firewall_mode],
+            whitelist=args.firewall_whitelist or [],
+            blacklist=args.firewall_blacklist or [],
+            peers_file=args.firewall_peers_file,
+        )
+
     print("Initializing Synth Mind with dashboard...")
 
     # Initialize orchestrator
@@ -1434,7 +1698,9 @@ async def main():
         rate_limit_enabled=not args.no_rate_limit,
         rate_limit_config=rate_limit_config,
         access_log_enabled=not args.no_access_log,
-        access_log_config=access_log_config
+        access_log_config=access_log_config,
+        firewall_enabled=args.firewall,
+        firewall_config=firewall_config
     )
 
     # Start both server and orchestrator
