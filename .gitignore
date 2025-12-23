@@ -68,6 +68,9 @@ logs/
 # State files
 state/
 
+# Runtime-generated firewall rules
+config/firewall_rules.json
+
 # OS
 .DS_Store
 Thumbs.db
