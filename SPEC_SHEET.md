@@ -1,8 +1,8 @@
 # Synth Mind — Technical Specification Sheet
 
-> **Version:** 1.4
+> **Version:** 1.5
 > **Last Updated:** 2024-12-23
-> **Status:** Core Complete — Production Ready (JWT Auth + Gantt Charts)
+> **Status:** Core Complete — Production Ready (JWT Auth + Gantt Charts + Consolidated Docs)
 
 ---
 
@@ -27,6 +27,7 @@
 | Collaborative Projects | ✅ Complete | Multi-agent project collaboration |
 | JWT Authentication | ✅ Complete | Production-ready auth with roles |
 | Visual Timeline/Gantt | ✅ Complete | Interactive project visualization |
+| Documentation | ✅ Complete | Consolidated in `/docs` folder |
 
 ### Detailed Component Status
 
@@ -963,11 +964,10 @@ synth-mind/
 │   └── synth.log                   # Application logs
 │
 └── docs/
-    ├── README.md                   # Main documentation
-    ├── QUICKSTART.md               # 5-minute setup
+    ├── QUICKSTART.md               # 5-minute setup guide
     ├── system-arch.md              # High-level architecture
-    ├── GDIL_README.md              # GDIL guide
-    ├── GDIL_COMPLETE.md            # GDIL spec
+    ├── GDIL_README.md              # GDIL user guide
+    ├── GDIL_COMPLETE.md            # GDIL specification
     ├── PEER_SETUP.md               # Multi-instance guide
     ├── Query-Rating.md             # Self-healing design
     └── Repository-Structure.md     # File organization
@@ -1132,8 +1132,10 @@ MIT License — see [LICENSE](LICENSE) file
 ## References
 
 - [README.md](README.md) — Main documentation
-- [QUICKSTART.md](QUICKSTART.md) — 5-minute setup guide
-- [system-arch.md](system-arch.md) — High-level architecture
-- [GDIL_README.md](GDIL_README.md) — GDIL complete guide
-- [PEER_SETUP.md](PEER_SETUP.md) — Multi-instance configuration
+- [QUICKSTART.md](docs/QUICKSTART.md) — 5-minute setup guide
+- [system-arch.md](docs/system-arch.md) — High-level architecture
+- [GDIL_README.md](docs/GDIL_README.md) — GDIL complete guide
+- [GDIL_COMPLETE.md](docs/GDIL_COMPLETE.md) — GDIL specification
+- [PEER_SETUP.md](docs/PEER_SETUP.md) — Multi-instance configuration
+- [Query-Rating.md](docs/Query-Rating.md) — Self-healing design
 - [dashboard/README_DASHBOARD.md](dashboard/README_DASHBOARD.md) — Dashboard features

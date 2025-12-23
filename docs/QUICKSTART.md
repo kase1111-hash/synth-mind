@@ -68,7 +68,7 @@ and adapt through our shared explorations..."
 The narrative evolves based on your interactions!
 Next Steps
 
-Read README.md for architecture details
+Read [README.md](../README.md) for architecture details
 Check examples/simple_chat.py for programmatic usage
 Explore configuration in .env.example
 Join the discussion: GitHub Discussions
@@ -96,6 +96,6 @@ Safe to delete for fresh start (loses history)
 
 Getting Help
 
-📖 Full docs: README.md
+📖 Full docs: [README.md](../README.md)
 🐛 Issues: GitHub Issues
 💬 Chat: Discord
