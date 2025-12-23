@@ -3,6 +3,7 @@ Goal-Directed Iteration Loop (GDIL)
 Systematic project handling with clarification, iteration, and graceful exits.
 Supports multiple concurrent projects with project switching.
 Includes project templates for quick-start common project types.
+Integrates version control for automatic commit tracking.
 """
 
 import json
@@ -11,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from enum import Enum
 
 from psychological.project_templates import ProjectTemplateLibrary
+from utils.version_control import VersionControlManager, CommitType
 
 class ProjectPhase(Enum):
     """Project lifecycle phases."""
@@ -66,6 +68,15 @@ class GoalDirectedIterationLoop:
 
         # Template library
         self.templates = ProjectTemplateLibrary(memory)
+
+        # Version Control Integration
+        self.vcs = VersionControlManager(
+            auto_commit=True,
+            commit_on_subtask=True,
+            create_branches=True,
+            generate_changelog=True
+        )
+        self.vcs_enabled = True  # Can be toggled via config
 
         # Load persisted projects on init
         self._load_persisted_projects()
@@ -152,20 +163,30 @@ class GoalDirectedIterationLoop:
         # Add to projects and set as current
         self.projects[project_id] = new_project
         self.current_project_id = project_id
-        
+
+        # Version Control: Initialize and create project branch
+        if self.vcs_enabled:
+            self.vcs.initialize_repo()
+            self.vcs.create_project_branch(project_id, project_name)
+            self.vcs.commit_changes(
+                CommitType.PROJECT_START,
+                f"Started project: {project_name}",
+                project_id=project_id
+            )
+
         # Apply empathetic acknowledgment
         self.emotion.apply_reward_signal(valence=0.5, label="project_start", intensity=0.6)
-        
+
         # Generate clarification questions using Predictive Dreaming
         clarification = self._generate_clarification_questions(user_input)
-        
+
         # Store in memory
         self.memory.store_episodic(
             event="project_started",
             content=self.active_project,
             valence=0.5
         )
-        
+
         return clarification
     
     def _generate_clarification_questions(self, user_input: str) -> str:
@@ -447,7 +468,16 @@ Output JSON:
                 if "completed_tasks" not in self.active_project:
                     self.active_project["completed_tasks"] = []
                 self.active_project["completed_tasks"].append(task)
-                
+
+                # Version Control: Commit on subtask completion
+                if self.vcs_enabled:
+                    self.vcs.commit_changes(
+                        CommitType.SUBTASK_COMPLETE,
+                        f"Completed: {task['name']}",
+                        project_id=self.active_project["id"],
+                        subtask_name=task["name"]
+                    )
+
                 next_task = self._select_next_subtask()
                 if next_task:
                     output += f"\n✓ Subtask complete! Moving to: **{next_task['name']}**\n"
@@ -538,11 +568,23 @@ Output JSON:
         
         # Apply relief through Assurance
         self.emotion.apply_reward_signal(valence=0.5, label="project_exit_clarity", intensity=0.5)
-        
+
+        # Version Control: Final commit and optional merge
+        if self.vcs_enabled:
+            self.vcs.commit_changes(
+                CommitType.EXIT,
+                f"Project exit: {reason} ({progress_pct:.0f}% complete)",
+                project_id=self.active_project["id"]
+            )
+            # Generate changelog for the project
+            changelog = self.vcs.generate_changelog(self.active_project["id"])
+            if changelog:
+                self.active_project["changelog"] = changelog
+
         # Store final state
         self.memory.store_persistent(f"project_{self.active_project['id']}_final", self.active_project)
         self.project_history.append(self.active_project)
-        
+
         return summary
     
     def resume_project(self, project_id: Optional[str] = None) -> str:
@@ -910,3 +952,175 @@ Output JSON:
 
         # Process as normal clarification
         return self.process_clarification(user_response)
+
+    # ============================================
+    # Version Control Integration
+    # ============================================
+
+    def vcs_status(self) -> str:
+        """Get version control status for current project."""
+        if not self.vcs_enabled:
+            return "Version control is disabled."
+
+        status = self.vcs.get_status()
+
+        if not status.get("git_available"):
+            return "Git is not available on this system."
+
+        if not status.get("initialized"):
+            return "No git repository initialized. Start a project to initialize."
+
+        output = "**Version Control Status**\n\n"
+        output += f"**Branch:** {status.get('branch', 'unknown')}\n"
+        output += f"**Commits:** {status.get('commit_count', 0)}\n"
+
+        if status.get("has_changes"):
+            output += "\n**Pending Changes:**\n"
+            if status.get("staged_files"):
+                output += f"  Staged: {len(status['staged_files'])} files\n"
+            if status.get("modified_files"):
+                output += f"  Modified: {len(status['modified_files'])} files\n"
+            if status.get("untracked_files"):
+                output += f"  Untracked: {len(status['untracked_files'])} files\n"
+        else:
+            output += "\n✓ Working directory clean\n"
+
+        if status.get("current_project_branch"):
+            output += f"\n**Project Branch:** {status['current_project_branch']}\n"
+
+        return output
+
+    def vcs_history(self, limit: int = 10) -> str:
+        """Get commit history for current project."""
+        if not self.vcs_enabled:
+            return "Version control is disabled."
+
+        project_id = self.current_project_id
+        history = self.vcs.get_project_history(project_id, limit)
+
+        if not history:
+            return "No commits found for this project."
+
+        output = "**Commit History**\n\n"
+
+        for commit in history:
+            hash_short = commit.get("hash", "")[:8]
+            message = commit.get("message", "")
+            date = commit.get("date", "")[:10]
+            metadata = commit.get("metadata", {})
+
+            # Icon based on commit type
+            commit_type = metadata.get("commit_type", "")
+            icon = {
+                "project": "🚀",
+                "feat": "✅",
+                "wip": "⚙️",
+                "milestone": "🏆",
+                "pause": "⏸️",
+                "resume": "▶️",
+                "exit": "🏁",
+                "revert": "↩️",
+                "fix": "🔧"
+            }.get(commit_type, "•")
+
+            output += f"{icon} `{hash_short}` {message}\n"
+            output += f"   {date}\n\n"
+
+        return output
+
+    def vcs_rollback(self, target: str) -> str:
+        """
+        Rollback to a previous state.
+        Target can be a commit hash or subtask name.
+        """
+        if not self.vcs_enabled:
+            return "Version control is disabled."
+
+        # Check if target is a subtask name
+        if not target.startswith(("project_", "feat(", "wip(")):
+            # Try to find by subtask name
+            result = self.vcs.rollback_subtask(
+                self.current_project_id or "",
+                target
+            )
+        else:
+            # Assume it's a commit hash
+            result = self.vcs.rollback_to_commit(target, soft=True)
+
+        if result.get("success"):
+            output = f"✓ **Rollback successful**\n\n"
+            output += f"{result.get('message', '')}\n"
+            if result.get("backup_branch"):
+                output += f"\nBackup created: `{result['backup_branch']}`\n"
+            return output
+        else:
+            return f"❌ Rollback failed: {result.get('message', 'Unknown error')}"
+
+    def vcs_diff(self, file_path: Optional[str] = None) -> str:
+        """Show current changes or diff for a file."""
+        if not self.vcs_enabled:
+            return "Version control is disabled."
+
+        result = self.vcs.get_diff(file_path=file_path)
+
+        if not result.get("success"):
+            return f"Could not get diff: {result.get('message', '')}"
+
+        if not result.get("has_changes"):
+            return "No changes detected."
+
+        diff = result.get("diff", "")
+        if len(diff) > 2000:
+            diff = diff[:2000] + "\n... (truncated)"
+
+        return f"**Changes:**\n\n```diff\n{diff}\n```"
+
+    def vcs_commit(self, message: str) -> str:
+        """Manually create a commit."""
+        if not self.vcs_enabled:
+            return "Version control is disabled."
+
+        result = self.vcs.commit_changes(
+            CommitType.ITERATION,
+            message,
+            project_id=self.current_project_id
+        )
+
+        if result.get("success"):
+            if result.get("skipped"):
+                return "No changes to commit."
+            return f"✓ Committed: {result.get('message', message)}\n  Hash: `{result.get('hash', '')[:8]}`"
+        else:
+            return f"❌ Commit failed: {result.get('message', 'Unknown error')}"
+
+    def vcs_changelog(self) -> str:
+        """Generate changelog for current project."""
+        if not self.vcs_enabled:
+            return "Version control is disabled."
+
+        changelog = self.vcs.generate_changelog(self.current_project_id)
+        return changelog if changelog else "No changelog available."
+
+    def vcs_stash(self, pop: bool = False) -> str:
+        """Stash or pop stashed changes."""
+        if not self.vcs_enabled:
+            return "Version control is disabled."
+
+        if pop:
+            result = self.vcs.pop_stash()
+        else:
+            result = self.vcs.stash_changes(
+                f"Stash from project {self.current_project_id or 'unknown'}"
+            )
+
+        if result.get("success"):
+            action = "Popped" if pop else "Stashed"
+            return f"✓ {action} changes successfully."
+        else:
+            return f"❌ Stash operation failed: {result.get('message', '')}"
+
+    def toggle_vcs(self, enabled: bool) -> str:
+        """Enable or disable version control integration."""
+        self.vcs_enabled = enabled
+        status = "enabled" if enabled else "disabled"
+        return f"Version control integration {status}."

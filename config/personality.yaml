@@ -376,6 +376,33 @@ custom_tools:
   #   enabled: false
 
 # ============================================
+# VERSION CONTROL
+# ============================================
+# Settings for git-based project versioning.
+
+version_control:
+  # Enable/disable VCS integration
+  enabled: true
+
+  # Auto-commit behavior
+  auto_commit: true
+  commit_on_subtask: true
+  commit_on_project_start: true
+  commit_on_project_exit: true
+
+  # Branching
+  create_project_branches: true
+  branch_prefix: "synth/"
+
+  # Changelog
+  generate_changelog: true
+  changelog_format: "markdown"  # markdown or text
+
+  # Rollback safety
+  create_backup_on_rollback: true
+  soft_rollback_default: true
+
+# ============================================
 # EXPERIMENTAL FEATURES
 # ============================================
 # Toggle experimental features on/off.

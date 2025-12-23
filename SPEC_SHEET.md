@@ -1,8 +1,8 @@
 # Synth Mind — Technical Specification Sheet
 
-> **Version:** 1.5
+> **Version:** 1.6
 > **Last Updated:** 2024-12-23
-> **Status:** Core Complete — Production Ready (JWT Auth + Gantt Charts + Consolidated Docs)
+> **Status:** Core Complete — Production Ready (JWT Auth + Gantt Charts + VCS Integration)
 
 ---
 
@@ -27,6 +27,7 @@
 | Collaborative Projects | ✅ Complete | Multi-agent project collaboration |
 | JWT Authentication | ✅ Complete | Production-ready auth with roles |
 | Visual Timeline/Gantt | ✅ Complete | Interactive project visualization |
+| Version Control | ✅ Complete | Git integration with auto-commit, rollback |
 | Documentation | ✅ Complete | Consolidated in `/docs` folder |
 
 ### Detailed Component Status
@@ -60,6 +61,9 @@
 
 | Component | File | Notes |
 |-----------|------|-------|
+| Version Control Manager | `utils/version_control.py` | Git wrapper with auto-commit, rollback, changelog |
+| VCS GDIL Integration | `psychological/goal_directed_iteration.py` | Auto-commits on project/subtask events |
+| VCS CLI Commands | `core/orchestrator.py` | `/vcs status`, `/vcs history`, `/vcs rollback`, etc. |
 | Personality Configuration | `config/personality.yaml` | 4 personality profiles, GDIL/flow/module settings |
 | Uncertainty Logging | `core/memory.py` | `uncertainty_log` table with full CRUD |
 | Query Rating Integration | `psychological/assurance_resolution.py` | Auto-logs low-confidence responses |
@@ -942,7 +946,8 @@ synth-mind/
 │   ├── emotion_regulator.py        # Valence tracking
 │   ├── metrics.py                  # Performance tracking
 │   ├── logging.py                  # Logging setup
-│   └── auth.py                     # JWT authentication
+│   ├── auth.py                     # JWT authentication
+│   └── version_control.py          # Git VCS integration
 │
 ├── dashboard/
 │   ├── server.py                   # WebSocket server

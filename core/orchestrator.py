@@ -446,6 +446,52 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             self._print_tools()
         elif cmd.startswith("/tool "):
             await self._execute_tool(command[6:].strip())
+        # Version Control Commands
+        elif cmd == "/vcs" or cmd == "/vcs help":
+            self._print_vcs_help()
+        elif cmd == "/vcs status":
+            response = self.gdil.vcs_status()
+            print(f"\n{response}\n")
+        elif cmd == "/vcs history":
+            response = self.gdil.vcs_history()
+            print(f"\n{response}\n")
+        elif cmd.startswith("/vcs history "):
+            try:
+                limit = int(command[13:].strip())
+                response = self.gdil.vcs_history(limit)
+            except ValueError:
+                response = self.gdil.vcs_history()
+            print(f"\n{response}\n")
+        elif cmd.startswith("/vcs rollback "):
+            target = command[14:].strip()
+            response = self.gdil.vcs_rollback(target)
+            print(f"\n{response}\n")
+        elif cmd == "/vcs diff":
+            response = self.gdil.vcs_diff()
+            print(f"\n{response}\n")
+        elif cmd.startswith("/vcs diff "):
+            file_path = command[10:].strip()
+            response = self.gdil.vcs_diff(file_path)
+            print(f"\n{response}\n")
+        elif cmd.startswith("/vcs commit "):
+            message = command[12:].strip()
+            response = self.gdil.vcs_commit(message)
+            print(f"\n{response}\n")
+        elif cmd == "/vcs changelog":
+            response = self.gdil.vcs_changelog()
+            print(f"\n{response}\n")
+        elif cmd == "/vcs stash":
+            response = self.gdil.vcs_stash(pop=False)
+            print(f"\n{response}\n")
+        elif cmd == "/vcs stash pop":
+            response = self.gdil.vcs_stash(pop=True)
+            print(f"\n{response}\n")
+        elif cmd == "/vcs on":
+            response = self.gdil.toggle_vcs(True)
+            print(f"\n{response}\n")
+        elif cmd == "/vcs off":
+            response = self.gdil.toggle_vcs(False)
+            print(f"\n{response}\n")
         elif cmd == "/quit":
             self.running = False
         else:
@@ -493,6 +539,35 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         print("\n**Sync & Stats:**")
         print("  /collab sync              - Sync with peer agents")
         print("  /collab stats             - View collaboration statistics")
+        print("\n" + "="*60 + "\n")
+
+    def _print_vcs_help(self):
+        """Display version control help."""
+        print("\n" + "="*60)
+        print("VERSION CONTROL INTEGRATION")
+        print("="*60)
+        print("\n**Status & History:**")
+        print("  /vcs status               - Show git status and branch info")
+        print("  /vcs history [N]          - Show last N commits (default: 10)")
+        print("  /vcs changelog            - Generate project changelog")
+        print("\n**Changes:**")
+        print("  /vcs diff                 - Show all pending changes")
+        print("  /vcs diff <file>          - Show changes for specific file")
+        print("  /vcs commit <message>     - Create a manual commit")
+        print("\n**Stash:**")
+        print("  /vcs stash                - Stash current changes")
+        print("  /vcs stash pop            - Restore stashed changes")
+        print("\n**Rollback:**")
+        print("  /vcs rollback <hash>      - Rollback to commit hash")
+        print("  /vcs rollback <subtask>   - Rollback subtask changes")
+        print("\n**Settings:**")
+        print("  /vcs on                   - Enable auto-commit")
+        print("  /vcs off                  - Disable auto-commit")
+        print("\n**Automatic Behavior:**")
+        print("  • Commits on project start")
+        print("  • Commits on subtask completion")
+        print("  • Commits on project exit")
+        print("  • Creates project branches")
         print("\n" + "="*60 + "\n")
 
     async def _execute_tool(self, tool_call: str):
