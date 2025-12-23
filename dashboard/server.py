@@ -284,10 +284,35 @@ class DashboardServer:
             "metrics": {
                 "predictive_alignment": metrics['predictive_alignment'],
                 "user_sentiment": metrics['user_sentiment']
-            }
+            },
+
+            # Project status (if active)
+            "project": self._get_project_state()
         }
-        
+
         return state
+
+    def _get_project_state(self) -> dict:
+        """Get current project status for dashboard."""
+        if not self.orchestrator.gdil or not self.orchestrator.gdil.active_project:
+            return None
+
+        project = self.orchestrator.gdil.active_project
+        phase = project.get("phase")
+        phase_value = phase.value if hasattr(phase, 'value') else str(phase)
+
+        return {
+            "id": project.get("id"),
+            "name": project.get("name", "Unnamed"),
+            "phase": phase_value,
+            "brief": project.get("brief", "In progress"),
+            "progress": project.get("progress_score", 0),
+            "iterations": len(project.get("iterations", [])),
+            "completed_tasks": len(project.get("completed_tasks", [])),
+            "total_tasks": len(project.get("roadmap", [])),
+            "current_subtask": project.get("current_subtask", {}).get("name", "None") if project.get("current_subtask") else "None",
+            "total_projects": len(self.orchestrator.gdil.projects)
+        }
     
     async def send_state_update(self, ws: web.WebSocketResponse):
         """Send state update to specific WebSocket."""
