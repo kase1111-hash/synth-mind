@@ -25,14 +25,15 @@ synth-mind/
 │   ├── __init__.py                    ⚠️  Create empty file
 │   ├── emotion_regulator.py           ✅ Complete (Valence tracking)
 │   ├── metrics.py                     ✅ Complete (Performance tracking)
-│   └── logging.py                     ✅ Complete (Logging setup)
+│   ├── logging.py                     ✅ Complete (Logging setup)
+│   └── version_control.py             ✅ Complete (Git VCS integration)
 │
 ├── examples/
 │   ├── __init__.py                    ⚠️  Create empty file
 │   └── simple_chat.py                 ✅ Complete (Demo script)
 │
-├── config/                            ⚠️  To be created by user
-│   ├── personality.yaml               ⚠️  Optional (future)
+├── config/
+│   ├── personality.yaml               ✅ Complete (Profiles, GDIL, flow settings)
 │   └── peers.txt                      ⚠️  Optional (for social layer)
 │
 └── state/                             ⚠️  Auto-generated on first run

@@ -2,10 +2,12 @@
 Dashboard Server - WebSocket server for real-time state streaming.
 Serves the HTML dashboard and broadcasts internal state updates.
 Includes JWT authentication for production security.
+Supports HTTPS/WSS encryption for secure communication.
 """
 
 import asyncio
 import json
+import ssl
 import sys
 from pathlib import Path
 from typing import Set, Optional
@@ -18,14 +20,15 @@ try:
     from aiohttp import web
     import aiohttp_cors
 except ImportError:
-    print("Installing required packages...")
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "aiohttp", "aiohttp-cors"])
-    from aiohttp import web
-    import aiohttp_cors
+    raise ImportError(
+        "aiohttp and aiohttp-cors are required for the dashboard server. "
+        "Install them with: pip install aiohttp aiohttp-cors"
+    )
 
 from core.orchestrator import SynthOrchestrator
 from utils.auth import AuthManager, UserRole
+from utils.rate_limiter import RateLimiter, RateLimitConfig, create_rate_limit_middleware
+from utils.access_logger import AccessLogger, AccessLogConfig, LogFormat, create_access_log_middleware
 
 class DashboardServer:
     """WebSocket server for streaming internal state to dashboard."""
@@ -42,24 +45,107 @@ class DashboardServer:
     ]
 
     def __init__(self, orchestrator: SynthOrchestrator, port: int = 8080,
-                 auth_enabled: bool = True):
+                 auth_enabled: bool = True, allowed_origins: list = None,
+                 ssl_cert: str = None, ssl_key: str = None,
+                 ssl_context: ssl.SSLContext = None,
+                 rate_limit_enabled: bool = True,
+                 rate_limit_config: RateLimitConfig = None,
+                 access_log_enabled: bool = True,
+                 access_log_config: AccessLogConfig = None):
+        """
+        Initialize the dashboard server.
+
+        Args:
+            orchestrator: The SynthOrchestrator instance
+            port: Server port (default: 8080)
+            auth_enabled: Enable JWT authentication (default: True)
+            allowed_origins: List of allowed CORS origins
+            ssl_cert: Path to SSL certificate file (enables HTTPS)
+            ssl_key: Path to SSL private key file
+            ssl_context: Pre-configured SSLContext (overrides ssl_cert/ssl_key)
+            rate_limit_enabled: Enable rate limiting (default: True)
+            rate_limit_config: Custom rate limit configuration
+            access_log_enabled: Enable access logging (default: True)
+            access_log_config: Custom access log configuration
+        """
         self.orchestrator = orchestrator
         self.port = port
         self.auth_enabled = auth_enabled
         self.websockets: Set[web.WebSocketResponse] = set()
         self.state_cache = {}
 
+        # SSL/TLS configuration
+        self.ssl_context = ssl_context
+        self.ssl_cert = ssl_cert
+        self.ssl_key = ssl_key
+        self.is_https = False
+
+        # Initialize SSL context if cert/key provided
+        if ssl_cert and ssl_key and not ssl_context:
+            self.ssl_context = self._create_ssl_context(ssl_cert, ssl_key)
+
+        if self.ssl_context:
+            self.is_https = True
+
+        # Determine protocol for CORS
+        protocol = "https" if self.is_https else "http"
+
+        # CORS allowed origins (restricted to localhost by default for security)
+        self.allowed_origins = allowed_origins or [
+            f"{protocol}://localhost:8080",
+            f"{protocol}://127.0.0.1:8080",
+            f"{protocol}://localhost:{port}",
+            f"{protocol}://127.0.0.1:{port}",
+            # Also allow HTTP origins when using HTTPS (for redirects)
+            f"http://localhost:{port}",
+            f"http://127.0.0.1:{port}",
+        ]
+
         # Initialize authentication
         self.auth = AuthManager() if auth_enabled else None
 
-        # Create app with middleware
-        if auth_enabled:
-            self.app = web.Application(middlewares=[self._auth_middleware])
+        # Initialize rate limiter
+        self.rate_limit_enabled = rate_limit_enabled
+        if rate_limit_enabled:
+            config = rate_limit_config or RateLimitConfig()
+            self.rate_limiter = RateLimiter(config)
         else:
-            self.app = web.Application()
+            self.rate_limiter = None
+
+        # Initialize access logger
+        self.access_log_enabled = access_log_enabled
+        if access_log_enabled:
+            config = access_log_config or AccessLogConfig()
+            self.access_logger = AccessLogger(config)
+        else:
+            self.access_logger = None
+
+        # Build middleware stack (order matters: logging first, then rate limit, then auth)
+        middlewares = []
+        if access_log_enabled and self.access_logger:
+            middlewares.append(create_access_log_middleware(self.access_logger))
+        if rate_limit_enabled and self.rate_limiter:
+            middlewares.append(create_rate_limit_middleware(self.rate_limiter))
+        if auth_enabled:
+            middlewares.append(self._auth_middleware)
+
+        # Create app with middleware
+        self.app = web.Application(middlewares=middlewares)
 
         # Setup routes
         self._setup_routes()
+
+    def _create_ssl_context(self, cert_path: str, key_path: str) -> ssl.SSLContext:
+        """Create SSL context from certificate and key files."""
+        try:
+            from utils.ssl_utils import create_ssl_context
+            return create_ssl_context(cert_path, key_path)
+        except ImportError:
+            # Fallback if ssl_utils not available
+            ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_context.load_cert_chain(cert_path, key_path)
+            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            return ssl_context
         
     def _setup_routes(self):
         """Setup HTTP and WebSocket routes."""
@@ -96,14 +182,31 @@ class DashboardServer:
         self.app.router.add_get('/timeline', self.serve_timeline)
         self.app.router.add_get('/api/timeline', self.get_timeline_data)
 
-        # Enable CORS
-        cors = aiohttp_cors.setup(self.app, defaults={
-            "*": aiohttp_cors.ResourceOptions(
+        # Rate limiting API
+        self.app.router.add_get('/api/ratelimit/stats', self.ratelimit_stats)
+
+        # Access logging API
+        self.app.router.add_get('/api/accesslog/stats', self.accesslog_stats)
+
+        # Enable CORS with restricted origins (security fix)
+        # Only allow localhost by default - configure allowed_origins for production
+        allowed_origins = getattr(self, 'allowed_origins', [
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            f"http://localhost:{self.port}",
+            f"http://127.0.0.1:{self.port}",
+        ])
+
+        cors_config = {}
+        for origin in allowed_origins:
+            cors_config[origin] = aiohttp_cors.ResourceOptions(
                 allow_credentials=True,
-                expose_headers="*",
-                allow_headers="*",
+                expose_headers=["Content-Type", "Authorization"],
+                allow_headers=["Content-Type", "Authorization"],
+                allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             )
-        })
+
+        cors = aiohttp_cors.setup(self.app, defaults=cors_config)
         for route in list(self.app.router.routes()):
             cors.add(route)
     
@@ -443,6 +546,58 @@ class DashboardServer:
                     "success": False,
                     "error": "Collaboration not available"
                 }, status=503)
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def ratelimit_stats(self, request):
+        """Get rate limiting statistics (admin only)."""
+        # Check admin permission
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.rate_limit_enabled or not self.rate_limiter:
+            return web.json_response({
+                "success": True,
+                "enabled": False,
+                "message": "Rate limiting is disabled"
+            })
+
+        try:
+            stats = self.rate_limiter.get_stats()
+            return web.json_response({
+                "success": True,
+                **stats
+            })
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def accesslog_stats(self, request):
+        """Get access logging statistics (admin only)."""
+        # Check admin permission
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.access_log_enabled or not self.access_logger:
+            return web.json_response({
+                "success": True,
+                "enabled": False,
+                "message": "Access logging is disabled"
+            })
+
+        try:
+            stats = self.access_logger.get_stats()
+            return web.json_response({
+                "success": True,
+                **stats
+            })
         except Exception as e:
             return web.json_response(
                 {"error": str(e), "success": False},
@@ -1043,9 +1198,11 @@ class DashboardServer:
     </div>
     <script>
         let ws;
-        
+
         function connect() {
-            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            // Use WSS for HTTPS, WS for HTTP
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
             
             ws.onopen = () => {
                 document.getElementById('ws-status').textContent = 'Connected';
@@ -1097,18 +1254,38 @@ class DashboardServer:
                 await self.broadcast_state()
     
     async def start(self):
-        """Start the server."""
+        """Start the server with optional HTTPS/WSS support."""
         # Start background broadcaster
         asyncio.create_task(self.start_background_broadcast())
 
         # Start web server
         runner = web.AppRunner(self.app)
         await runner.setup()
-        site = web.TCPSite(runner, 'localhost', self.port)
+
+        # Use SSL if configured
+        if self.ssl_context:
+            site = web.TCPSite(
+                runner,
+                'localhost',
+                self.port,
+                ssl_context=self.ssl_context
+            )
+            protocol = "https"
+            ws_protocol = "wss"
+        else:
+            site = web.TCPSite(runner, 'localhost', self.port)
+            protocol = "http"
+            ws_protocol = "ws"
+
         await site.start()
 
         print(f"\n{'='*60}")
-        print(f"  Dashboard server running at http://localhost:{self.port}")
+        print(f"  Dashboard server running at {protocol}://localhost:{self.port}")
+        if self.is_https:
+            print(f"  WebSocket endpoint: {ws_protocol}://localhost:{self.port}/ws")
+            print(f"  TLS: ENABLED (TLS 1.2+)")
+            if self.ssl_cert:
+                print(f"  Certificate: {self.ssl_cert}")
         print(f"{'='*60}")
 
         # Show authentication status
@@ -1121,6 +1298,28 @@ class DashboardServer:
                 print(f"  POST /api/auth/login to authenticate")
         else:
             print(f"  Authentication: DISABLED")
+
+        # Show rate limiting status
+        if self.rate_limit_enabled and self.rate_limiter:
+            config = self.rate_limiter.config
+            print(f"  Rate Limiting: ENABLED")
+            print(f"    - Auth endpoints: {config.strict_limit}/min")
+            print(f"    - API endpoints: {config.standard_limit}/min")
+            print(f"    - Read-only: {config.relaxed_limit}/min")
+        else:
+            print(f"  Rate Limiting: DISABLED")
+
+        # Show access logging status
+        if self.access_log_enabled and self.access_logger:
+            config = self.access_logger.config
+            print(f"  Access Logging: ENABLED")
+            print(f"    - Format: {config.format.value}")
+            if config.log_to_file:
+                print(f"    - Log file: {config.log_file}")
+            if config.log_to_stdout:
+                print(f"    - Stdout: enabled")
+        else:
+            print(f"  Access Logging: DISABLED")
 
         print(f"{'='*60}\n")
 
@@ -1138,7 +1337,86 @@ async def main():
     parser = argparse.ArgumentParser(description='Synth Mind Dashboard Server')
     parser.add_argument('--port', type=int, default=8080, help='Server port (default: 8080)')
     parser.add_argument('--no-auth', action='store_true', help='Disable authentication')
+
+    # SSL/TLS options
+    ssl_group = parser.add_argument_group('SSL/TLS Options')
+    ssl_group.add_argument('--ssl-cert', type=str, help='Path to SSL certificate file')
+    ssl_group.add_argument('--ssl-key', type=str, help='Path to SSL private key file')
+    ssl_group.add_argument('--ssl-dev', action='store_true',
+                          help='Generate/use self-signed certificate for development')
+
+    # Rate limiting options
+    rate_group = parser.add_argument_group('Rate Limiting Options')
+    rate_group.add_argument('--no-rate-limit', action='store_true',
+                           help='Disable rate limiting')
+    rate_group.add_argument('--rate-limit-auth', type=int, default=5,
+                           help='Rate limit for auth endpoints (default: 5/min)')
+    rate_group.add_argument('--rate-limit-api', type=int, default=60,
+                           help='Rate limit for API endpoints (default: 60/min)')
+    rate_group.add_argument('--rate-limit-window', type=int, default=60,
+                           help='Rate limit window in seconds (default: 60)')
+
+    # Access logging options
+    log_group = parser.add_argument_group('Access Logging Options')
+    log_group.add_argument('--no-access-log', action='store_true',
+                          help='Disable access logging')
+    log_group.add_argument('--access-log-file', type=str, default='state/access.log',
+                          help='Access log file path (default: state/access.log)')
+    log_group.add_argument('--access-log-format', type=str, default='json',
+                          choices=['json', 'common', 'combined', 'simple'],
+                          help='Access log format (default: json)')
+    log_group.add_argument('--access-log-stdout', action='store_true',
+                          help='Also log to stdout')
+
     args = parser.parse_args()
+
+    # Handle SSL configuration
+    ssl_cert = args.ssl_cert
+    ssl_key = args.ssl_key
+
+    # Generate development certificates if requested
+    if args.ssl_dev:
+        try:
+            from utils.ssl_utils import get_or_create_dev_certs
+            ssl_cert, ssl_key = get_or_create_dev_certs()
+            print("\nUsing development SSL certificates (self-signed)")
+            print("Note: You may need to accept the certificate in your browser\n")
+        except ImportError as e:
+            print(f"Warning: Could not generate dev certificates: {e}")
+            print("Install cryptography: pip install cryptography")
+            ssl_cert = ssl_key = None
+
+    # Validate SSL arguments
+    if (ssl_cert and not ssl_key) or (ssl_key and not ssl_cert):
+        parser.error("Both --ssl-cert and --ssl-key are required for HTTPS")
+
+    # Configure rate limiting
+    rate_limit_config = None
+    if not args.no_rate_limit:
+        rate_limit_config = RateLimitConfig(
+            strict_limit=args.rate_limit_auth,
+            standard_limit=args.rate_limit_api,
+            relaxed_limit=args.rate_limit_api * 2,  # Double for read-only
+            window_seconds=args.rate_limit_window,
+            enabled=True
+        )
+
+    # Configure access logging
+    access_log_config = None
+    if not args.no_access_log:
+        format_map = {
+            'json': LogFormat.JSON,
+            'common': LogFormat.COMMON,
+            'combined': LogFormat.COMBINED,
+            'simple': LogFormat.SIMPLE,
+        }
+        access_log_config = AccessLogConfig(
+            enabled=True,
+            format=format_map[args.access_log_format],
+            log_file=args.access_log_file,
+            log_to_file=True,
+            log_to_stdout=args.access_log_stdout,
+        )
 
     print("Initializing Synth Mind with dashboard...")
 
@@ -1150,7 +1428,13 @@ async def main():
     server = DashboardServer(
         orchestrator,
         port=args.port,
-        auth_enabled=not args.no_auth
+        auth_enabled=not args.no_auth,
+        ssl_cert=ssl_cert,
+        ssl_key=ssl_key,
+        rate_limit_enabled=not args.no_rate_limit,
+        rate_limit_config=rate_limit_config,
+        access_log_enabled=not args.no_access_log,
+        access_log_config=access_log_config
     )
 
     # Start both server and orchestrator

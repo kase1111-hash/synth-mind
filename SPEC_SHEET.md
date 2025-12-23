@@ -1,8 +1,8 @@
 # Synth Mind — Technical Specification Sheet
 
-> **Version:** 1.5
+> **Version:** 1.6
 > **Last Updated:** 2024-12-23
-> **Status:** Core Complete — Production Ready (JWT Auth + Gantt Charts + Consolidated Docs)
+> **Status:** Core Complete — Production Ready (JWT Auth + Gantt Charts + VCS Integration)
 
 ---
 
@@ -27,6 +27,7 @@
 | Collaborative Projects | ✅ Complete | Multi-agent project collaboration |
 | JWT Authentication | ✅ Complete | Production-ready auth with roles |
 | Visual Timeline/Gantt | ✅ Complete | Interactive project visualization |
+| Version Control | ✅ Complete | Git integration with auto-commit, rollback |
 | Documentation | ✅ Complete | Consolidated in `/docs` folder |
 
 ### Detailed Component Status
@@ -54,13 +55,16 @@
 
 | Component | Issue | Impact |
 |-----------|-------|--------|
-| `config/personality.yaml` | Empty file | Personality profiles not configured |
 | `config/peers.txt` | Empty file | No peers configured by default |
 
 #### ✅ Recently Implemented
 
 | Component | File | Notes |
 |-----------|------|-------|
+| Version Control Manager | `utils/version_control.py` | Git wrapper with auto-commit, rollback, changelog |
+| VCS GDIL Integration | `psychological/goal_directed_iteration.py` | Auto-commits on project/subtask events |
+| VCS CLI Commands | `core/orchestrator.py` | `/vcs status`, `/vcs history`, `/vcs rollback`, etc. |
+| Personality Configuration | `config/personality.yaml` | 4 personality profiles, GDIL/flow/module settings |
 | Uncertainty Logging | `core/memory.py` | `uncertainty_log` table with full CRUD |
 | Query Rating Integration | `psychological/assurance_resolution.py` | Auto-logs low-confidence responses |
 | Pattern Harvest Utility | `utils/harvest_patterns.py` | CLI tool for analysis + LLM-powered patterns |
@@ -93,7 +97,6 @@
 | Feature | Documentation | Notes |
 |---------|---------------|-------|
 | Voice Interface | README roadmap | Whisper + TTS not integrated |
-| Version Control Integration | GDIL_COMPLETE.md | No Git integration |
 
 ---
 
@@ -942,7 +945,11 @@ synth-mind/
 │   ├── emotion_regulator.py        # Valence tracking
 │   ├── metrics.py                  # Performance tracking
 │   ├── logging.py                  # Logging setup
-│   └── auth.py                     # JWT authentication
+│   ├── auth.py                     # JWT authentication
+│   ├── version_control.py          # Git VCS integration
+│   ├── ssl_utils.py                # SSL/TLS certificate utilities
+│   ├── rate_limiter.py             # API rate limiting
+│   └── access_logger.py            # HTTP access logging
 │
 ├── dashboard/
 │   ├── server.py                   # WebSocket server
@@ -962,6 +969,13 @@ synth-mind/
 │   ├── memory.db                   # Episodic/semantic storage
 │   ├── embeddings/                 # Vector store
 │   └── synth.log                   # Application logs
+│
+├── certs/                          # Auto-generated (gitignored)
+│   ├── server.crt                  # SSL certificate
+│   └── server.key                  # SSL private key
+│
+├── tests/
+│   └── test_security_e2e.py        # Security test suite
 │
 └── docs/
     ├── QUICKSTART.md               # 5-minute setup guide
@@ -1057,14 +1071,248 @@ curl http://localhost:8080/api/state \
   -H "Authorization: Bearer <access_token>"
 ```
 
+### HTTPS/WSS Encryption
+
+**Status:** ✅ Implemented
+**Files:** `dashboard/server.py`, `utils/ssl_utils.py`
+
+#### Overview
+
+The dashboard server supports HTTPS and WSS (WebSocket Secure) for encrypted communication. This ensures all data transmitted between the browser and server is protected.
+
+#### Features
+
+| Feature | Description |
+|---------|-------------|
+| TLS 1.2+ | Minimum TLS version enforced |
+| Self-signed Certs | Auto-generate dev certificates |
+| Custom Certificates | Use your own CA-signed certs |
+| WSS Auto-detection | Dashboard auto-switches to WSS on HTTPS |
+
+#### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `--ssl-cert PATH` | Path to SSL certificate file |
+| `--ssl-key PATH` | Path to SSL private key file |
+| `--ssl-dev` | Generate/use self-signed certificate for development |
+
+#### Usage Examples
+
+```bash
+# Development: Auto-generate self-signed certificate
+python dashboard/server.py --ssl-dev
+
+# Production: Use your own certificates
+python dashboard/server.py --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem
+
+# Combined with other options
+python dashboard/server.py --ssl-dev --port 8443 --no-auth
+```
+
+#### Certificate Generation
+
+For development, use the `--ssl-dev` flag which automatically generates self-signed certificates in the `certs/` directory.
+
+For production, you can:
+1. Use Let's Encrypt for free CA-signed certificates
+2. Generate certificates manually:
+   ```bash
+   python utils/ssl_utils.py --generate --hostname yourdomain.com
+   ```
+
+#### Certificate Utilities
+
+```bash
+# Generate self-signed certificate
+python utils/ssl_utils.py --generate
+
+# View certificate info
+python utils/ssl_utils.py --info certs/server.crt
+
+# Custom options
+python utils/ssl_utils.py --generate --hostname mydomain.com --days 365
+```
+
+### Rate Limiting
+
+**Status:** ✅ Implemented
+**Files:** `utils/rate_limiter.py`, `dashboard/server.py`
+
+#### Overview
+
+API rate limiting protects the server from abuse and ensures fair resource usage. Uses a sliding window algorithm with configurable limits per endpoint tier.
+
+#### Rate Limit Tiers
+
+| Tier | Limit | Endpoints |
+|------|-------|-----------|
+| Strict | 5/min | `/api/auth/login`, `/api/auth/setup`, `/api/auth/refresh` |
+| Standard | 60/min | Most API endpoints |
+| Relaxed | 120/min | Read-only: `/`, `/timeline`, `/api/state`, `/api/timeline` |
+| WebSocket | 10/min | New `/ws` connections |
+
+#### CLI Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--no-rate-limit` | - | Disable rate limiting |
+| `--rate-limit-auth` | 5 | Limit for auth endpoints per minute |
+| `--rate-limit-api` | 60 | Limit for API endpoints per minute |
+| `--rate-limit-window` | 60 | Window size in seconds |
+
+#### Response Headers
+
+All responses include rate limit headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed |
+| `X-RateLimit-Remaining` | Requests remaining in window |
+| `X-RateLimit-Reset` | Unix timestamp when limit resets |
+
+#### Rate Limit Exceeded Response
+
+```json
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+
+{
+  "error": "Rate limit exceeded",
+  "retry_after": 60,
+  "limit": 5,
+  "message": "Too many requests. Please wait 60 seconds."
+}
+```
+
+#### API Endpoint
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/ratelimit/stats` | GET | Admin | Get rate limiting statistics |
+
+#### Usage Examples
+
+```bash
+# Default rate limiting (enabled)
+python dashboard/server.py
+
+# Disable rate limiting
+python dashboard/server.py --no-rate-limit
+
+# Custom limits
+python dashboard/server.py --rate-limit-auth 10 --rate-limit-api 100
+
+# Combined with other options
+python dashboard/server.py --ssl-dev --rate-limit-api 30
+```
+
+### Access Logging
+
+**Status:** ✅ Implemented
+**Files:** `utils/access_logger.py`, `dashboard/server.py`
+
+#### Overview
+
+HTTP access logging provides visibility into all API requests for monitoring, debugging, and security auditing. Supports multiple log formats and destinations.
+
+#### Log Formats
+
+| Format | Description |
+|--------|-------------|
+| `json` | Structured JSON (default, best for parsing) |
+| `common` | Apache Common Log Format |
+| `combined` | Apache Combined Log Format (with referer/user-agent) |
+| `simple` | Human-readable single-line format |
+
+#### CLI Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--no-access-log` | - | Disable access logging |
+| `--access-log-file` | `state/access.log` | Log file path |
+| `--access-log-format` | `json` | Log format |
+| `--access-log-stdout` | - | Also log to stdout |
+
+#### Log Entry Fields (JSON format)
+
+| Field | Description |
+|-------|-------------|
+| `timestamp` | ISO 8601 timestamp |
+| `method` | HTTP method (GET, POST, etc.) |
+| `path` | Request path |
+| `status_code` | HTTP response status |
+| `duration_ms` | Request duration in milliseconds |
+| `client_ip` | Client IP address |
+| `user` | Authenticated username (if any) |
+| `user_agent` | User-Agent header |
+| `referer` | Referer header |
+| `response_size` | Response body size in bytes |
+
+#### Example Log Entries
+
+**JSON format:**
+```json
+{"timestamp": "2024-01-15T10:30:45.123Z", "method": "GET", "path": "/api/state", "status_code": 200, "duration_ms": 12.5, "client_ip": "127.0.0.1", "user": "admin"}
+```
+
+**Simple format:**
+```
+2024-01-15T10:30:45 | GET    | 200 |   12.5ms | 127.0.0.1       | admin           | /api/state
+```
+
+#### Log Rotation
+
+- Default max file size: 10MB
+- Keeps 5 backup files
+- Automatic rotation when size limit is reached
+
+#### API Endpoint
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/accesslog/stats` | GET | Admin | Get logging statistics |
+
+#### Usage Examples
+
+```bash
+# Default access logging (JSON to file)
+python dashboard/server.py
+
+# Disable access logging
+python dashboard/server.py --no-access-log
+
+# Custom log file and format
+python dashboard/server.py --access-log-file /var/log/synth.log --access-log-format combined
+
+# Log to both file and stdout
+python dashboard/server.py --access-log-stdout
+
+# Simple format for development
+python dashboard/server.py --access-log-format simple --access-log-stdout
+```
+
+#### Log Analysis Utilities
+
+```bash
+# View log statistics
+python utils/access_logger.py --stats
+
+# View last 20 log entries
+python utils/access_logger.py --tail 20
+
+# Custom log file
+python utils/access_logger.py --stats --log-file /path/to/access.log
+```
+
 ### Production Checklist
 
 - [x] JWT authentication
-- [ ] HTTPS/WSS encryption
-- [ ] Rate limiting on API endpoints
+- [x] HTTPS/WSS encryption
+- [x] Rate limiting on API endpoints
 - [x] Input validation
 - [x] CORS restrictions
-- [ ] Access logging
+- [x] Access logging
 - [ ] Firewall rules for peer IPs
 
 ---
@@ -1091,12 +1339,14 @@ curl http://localhost:8080/api/state \
 - [x] Collaborative multi-agent projects (task claiming, sync, roles)
 - [x] JWT authentication for production (role-based access control)
 - [x] Visual timeline/Gantt charts (interactive project visualization)
+- [x] Version control integration (Git auto-commit, rollback, changelog)
+- [x] HTTPS/WSS encryption (TLS 1.2+, self-signed cert generation)
+- [x] Rate limiting on API endpoints (sliding window, tiered limits)
+- [x] Access logging (multiple formats, rotation, analysis tools)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS
-- [ ] Version control integration
 - [ ] Cloud-hosted dashboards
-- [ ] HTTPS/WSS encryption
 
 ---
 
