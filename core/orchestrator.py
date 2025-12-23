@@ -278,6 +278,24 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         elif cmd == "/purpose":
             narrative = self.temporal.current_narrative_summary()
             print(f"\n📖 Current Narrative:\n  {narrative}\n")
+        elif cmd == "/projects":
+            # List all projects
+            response = self.gdil.list_projects()
+            print(f"\n{response}\n")
+        elif cmd.startswith("/project switch "):
+            # Switch to a different project
+            project_id = command[16:].strip()
+            response = self.gdil.switch_project(project_id)
+            print(f"\n🔄 {response}\n")
+        elif cmd == "/project pause":
+            # Pause current project
+            response = self.gdil.pause_project()
+            print(f"\n⏸️  {response}\n")
+        elif cmd.startswith("/project archive "):
+            # Archive a project
+            project_id = command[17:].strip()
+            response = self.gdil.archive_project(project_id)
+            print(f"\n📦 {response}\n")
         elif cmd.startswith("/project "):
             # Start new project
             description = command[9:].strip()

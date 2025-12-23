@@ -1,6 +1,7 @@
 """
 Goal-Directed Iteration Loop (GDIL)
 Systematic project handling with clarification, iteration, and graceful exits.
+Supports multiple concurrent projects with project switching.
 """
 
 import json
@@ -15,13 +16,16 @@ class ProjectPhase(Enum):
     ITERATION = "iteration"
     EXIT = "exit"
     PAUSED = "paused"
+    ARCHIVED = "archived"
+
 
 class GoalDirectedIterationLoop:
     """
     High-level orchestrator for multi-turn project handling.
     Integrates with all psychological modules for systematic progression.
+    Supports multiple concurrent projects with context switching.
     """
-    
+
     def __init__(
         self,
         llm,
@@ -34,7 +38,8 @@ class GoalDirectedIterationLoop:
         reward_calibration,
         iteration_threshold: float = 0.1,  # Min improvement to continue
         max_iterations: int = 10,
-        stall_iterations: int = 3  # Consecutive low-progress iterations before exit
+        stall_iterations: int = 3,  # Consecutive low-progress iterations before exit
+        max_concurrent_projects: int = 5  # Limit active projects
     ):
         self.llm = llm
         self.memory = memory
@@ -44,24 +49,87 @@ class GoalDirectedIterationLoop:
         self.assurance = assurance_module
         self.reflection = meta_reflection
         self.calibration = reward_calibration
-        
+
         # Configuration
         self.iteration_threshold = iteration_threshold
         self.max_iterations = max_iterations
         self.stall_iterations = stall_iterations
-        
-        # Active project state
-        self.active_project = None
-        self.project_history = []
+        self.max_concurrent_projects = max_concurrent_projects
+
+        # Multi-project state
+        self.projects: Dict[str, Dict] = {}  # All active projects
+        self.current_project_id: Optional[str] = None  # Currently focused project
+        self.project_history: List[Dict] = []  # Archived/completed projects
+
+        # Load persisted projects on init
+        self._load_persisted_projects()
+
+    @property
+    def active_project(self) -> Optional[Dict]:
+        """Get the currently focused project."""
+        if self.current_project_id and self.current_project_id in self.projects:
+            return self.projects[self.current_project_id]
+        return None
+
+    @active_project.setter
+    def active_project(self, project: Optional[Dict]):
+        """Set the currently focused project."""
+        if project is None:
+            self.current_project_id = None
+        else:
+            project_id = project.get("id")
+            if project_id:
+                self.projects[project_id] = project
+                self.current_project_id = project_id
+
+    def _load_persisted_projects(self):
+        """Load any persisted projects from memory."""
+        try:
+            saved_projects = self.memory.retrieve_persistent("gdil_projects")
+            if saved_projects:
+                self.projects = saved_projects
+                # Set current to most recently updated if any
+                if self.projects:
+                    most_recent = max(
+                        self.projects.values(),
+                        key=lambda p: p.get("updated_at", 0)
+                    )
+                    self.current_project_id = most_recent.get("id")
+        except Exception:
+            pass
+
+    def _save_all_projects(self):
+        """Persist all projects to memory."""
+        self.memory.store_persistent("gdil_projects", self.projects)
     
-    def start_project(self, user_input: str) -> str:
+    def start_project(self, user_input: str, project_name: Optional[str] = None) -> str:
         """
         Initialize a new project from user description.
         Phase 1: Clarify scope and goal.
+        Supports multiple concurrent projects.
         """
+        # Check concurrent project limit
+        active_count = len([
+            p for p in self.projects.values()
+            if p.get("phase") not in [ProjectPhase.EXIT, ProjectPhase.ARCHIVED, "exit", "archived"]
+        ])
+        if active_count >= self.max_concurrent_projects:
+            return (
+                f"You have {active_count} active projects (max: {self.max_concurrent_projects}).\n"
+                f"Use `/projects` to see them, `/project switch <id>` to switch, "
+                f"or `/project archive <id>` to archive one."
+            )
+
+        # Generate short name if not provided
+        if not project_name:
+            project_name = self._generate_project_name(user_input)
+
+        project_id = f"project_{int(time.time())}"
+
         # Create new project
-        self.active_project = {
-            "id": f"project_{int(time.time())}",
+        new_project = {
+            "id": project_id,
+            "name": project_name,
             "initial_input": user_input,
             "phase": ProjectPhase.INITIALIZATION,
             "brief": None,
@@ -74,6 +142,10 @@ class GoalDirectedIterationLoop:
             "created_at": time.time(),
             "updated_at": time.time()
         }
+
+        # Add to projects and set as current
+        self.projects[project_id] = new_project
+        self.current_project_id = project_id
         
         # Apply empathetic acknowledgment
         self.emotion.apply_reward_signal(valence=0.5, label="project_start", intensity=0.6)
@@ -512,14 +584,200 @@ Output JSON:
         """Get current project status for dashboard."""
         if not self.active_project:
             return None
-        
+
+        phase = self.active_project["phase"]
+        phase_value = phase.value if isinstance(phase, ProjectPhase) else str(phase)
+
         return {
             "id": self.active_project["id"],
-            "phase": self.active_project["phase"].value,
+            "name": self.active_project.get("name", "Unnamed"),
+            "phase": phase_value,
             "brief": self.active_project.get("brief", "In progress"),
             "progress": self.active_project["progress_score"],
             "iterations": len(self.active_project.get("iterations", [])),
             "completed_tasks": len(self.active_project.get("completed_tasks", [])),
             "total_tasks": len(self.active_project.get("roadmap", [])),
-            "current_subtask": self.active_project.get("current_subtask", {}).get("name", "None")
+            "current_subtask": self.active_project.get("current_subtask", {}).get("name", "None"),
+            "total_projects": len(self.projects)
         }
+
+    # ============================================
+    # Multi-Project Management
+    # ============================================
+
+    def _generate_project_name(self, user_input: str) -> str:
+        """Generate a short project name from user input."""
+        # Take first few meaningful words
+        words = user_input.split()[:5]
+        name = " ".join(words)
+        if len(name) > 40:
+            name = name[:37] + "..."
+        return name
+
+    def list_projects(self) -> str:
+        """List all active and paused projects."""
+        if not self.projects:
+            return "No active projects. Start one with `/project [description]`"
+
+        output = "**Your Projects:**\n\n"
+
+        # Sort by updated_at descending
+        sorted_projects = sorted(
+            self.projects.values(),
+            key=lambda p: p.get("updated_at", 0),
+            reverse=True
+        )
+
+        for project in sorted_projects:
+            project_id = project["id"]
+            name = project.get("name", "Unnamed")
+            phase = project.get("phase")
+            phase_str = phase.value if isinstance(phase, ProjectPhase) else str(phase)
+            progress = project.get("progress_score", 0) * 100
+
+            # Current indicator
+            current = " ← current" if project_id == self.current_project_id else ""
+
+            # Phase emoji
+            phase_emoji = {
+                "initialization": "🔄",
+                "planning": "📋",
+                "iteration": "⚡",
+                "paused": "⏸️",
+                "exit": "✓",
+                "archived": "📦"
+            }.get(phase_str, "•")
+
+            output += f"{phase_emoji} **{name}**{current}\n"
+            output += f"   ID: `{project_id}` | Phase: {phase_str} | Progress: {progress:.0f}%\n\n"
+
+        output += "\n**Commands:**\n"
+        output += "• `/project switch <id>` - Switch to a project\n"
+        output += "• `/project pause` - Pause current project\n"
+        output += "• `/project archive <id>` - Archive a project\n"
+
+        return output
+
+    def switch_project(self, project_id: str) -> str:
+        """Switch to a different project."""
+        # Handle short IDs (allow matching by suffix)
+        matching = [
+            pid for pid in self.projects.keys()
+            if pid == project_id or pid.endswith(project_id)
+        ]
+
+        if not matching:
+            return f"Project `{project_id}` not found. Use `/projects` to see all projects."
+
+        if len(matching) > 1:
+            return f"Ambiguous ID. Matches: {', '.join(matching)}"
+
+        target_id = matching[0]
+        target = self.projects[target_id]
+
+        # Pause current if different
+        if self.current_project_id and self.current_project_id != target_id:
+            current = self.projects.get(self.current_project_id)
+            if current:
+                current["phase"] = ProjectPhase.PAUSED
+                current["updated_at"] = time.time()
+
+        # Switch
+        self.current_project_id = target_id
+        target["updated_at"] = time.time()
+
+        # Save state
+        self._save_all_projects()
+
+        name = target.get("name", "Unnamed")
+        phase = target.get("phase")
+        phase_str = phase.value if isinstance(phase, ProjectPhase) else str(phase)
+        progress = target.get("progress_score", 0) * 100
+
+        output = f"**Switched to:** {name}\n\n"
+        output += f"Phase: {phase_str} | Progress: {progress:.0f}%\n"
+
+        if target.get("brief"):
+            output += f"\nBrief: {target['brief']}\n"
+
+        if target.get("current_subtask"):
+            output += f"\nCurrent task: {target['current_subtask'].get('name', 'None')}\n"
+
+        output += "\nReady to continue?"
+        return output
+
+    def pause_project(self, project_id: Optional[str] = None) -> str:
+        """Pause a project (defaults to current)."""
+        target_id = project_id or self.current_project_id
+
+        if not target_id or target_id not in self.projects:
+            return "No project to pause."
+
+        target = self.projects[target_id]
+        target["phase"] = ProjectPhase.PAUSED
+        target["updated_at"] = time.time()
+
+        # If pausing current, clear current
+        if target_id == self.current_project_id:
+            self.current_project_id = None
+
+        self._save_all_projects()
+
+        name = target.get("name", "Unnamed")
+        return f"Project **{name}** paused. Use `/project switch {target_id}` to resume."
+
+    def archive_project(self, project_id: str) -> str:
+        """Archive a project (remove from active list)."""
+        # Handle short IDs
+        matching = [
+            pid for pid in self.projects.keys()
+            if pid == project_id or pid.endswith(project_id)
+        ]
+
+        if not matching:
+            return f"Project `{project_id}` not found."
+
+        target_id = matching[0]
+        target = self.projects[target_id]
+
+        # Archive
+        target["phase"] = ProjectPhase.ARCHIVED
+        target["archived_at"] = time.time()
+
+        # Move to history
+        self.project_history.append(target)
+        del self.projects[target_id]
+
+        # If archived current, clear current
+        if target_id == self.current_project_id:
+            self.current_project_id = None
+            # Auto-switch to next most recent if any
+            if self.projects:
+                most_recent = max(
+                    self.projects.values(),
+                    key=lambda p: p.get("updated_at", 0)
+                )
+                self.current_project_id = most_recent.get("id")
+
+        self._save_all_projects()
+
+        name = target.get("name", "Unnamed")
+        return f"Project **{name}** archived."
+
+    def get_all_projects_status(self) -> List[Dict]:
+        """Get status of all projects for dashboard."""
+        statuses = []
+        for project in self.projects.values():
+            phase = project.get("phase")
+            phase_str = phase.value if isinstance(phase, ProjectPhase) else str(phase)
+
+            statuses.append({
+                "id": project["id"],
+                "name": project.get("name", "Unnamed"),
+                "phase": phase_str,
+                "progress": project.get("progress_score", 0),
+                "is_current": project["id"] == self.current_project_id,
+                "updated_at": project.get("updated_at", 0)
+            })
+
+        return sorted(statuses, key=lambda p: p["updated_at"], reverse=True)
