@@ -300,10 +300,107 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             self.context = []
             self.turn_count = 0
             print("\n✓ Session reset (identity preserved)\n")
+        elif cmd == "/tools":
+            self._print_tools()
+        elif cmd.startswith("/tool "):
+            await self._execute_tool(command[6:].strip())
         elif cmd == "/quit":
             self.running = False
         else:
             print(f"\n❓ Unknown command: {command}\n")
+
+    def _print_tools(self):
+        """Display available tools."""
+        tools = self.tools.get_all_tool_info()
+        print("\n" + "="*60)
+        print("AVAILABLE TOOLS")
+        print("="*60)
+        for name, info in tools.items():
+            print(f"\n🔧 {name}")
+            print(f"   {info['description']}")
+            params = ", ".join(f"{k}={v}" for k, v in info['params'].items())
+            print(f"   Params: {params}")
+            print(f"   Example: /tool {info['example']}")
+        print("\n" + "="*60)
+        print("Usage: /tool <tool_name>(<args>)")
+        print("Example: /tool calculator(expression='2 + 2')")
+        print("="*60 + "\n")
+
+    async def _execute_tool(self, tool_call: str):
+        """Execute a tool from command line."""
+        import re
+
+        # Parse tool call: tool_name(arg1='val1', arg2='val2')
+        match = re.match(r'(\w+)\((.*)\)', tool_call, re.DOTALL)
+        if not match:
+            # Try simple format: tool_name arg
+            parts = tool_call.split(maxsplit=1)
+            if len(parts) == 2:
+                tool_name = parts[0]
+                # Assume single main argument
+                info = self.tools.get_tool_info(tool_name)
+                if info and info['params']:
+                    first_param = list(info['params'].keys())[0]
+                    kwargs = {first_param: parts[1]}
+                    result = self.tools.execute(tool_name, **kwargs)
+                    self._print_tool_result(tool_name, result)
+                    return
+            print("\n❌ Invalid tool call format")
+            print("   Use: /tool tool_name(arg='value')")
+            print("   Or:  /tool tool_name value\n")
+            return
+
+        tool_name = match.group(1)
+        args_str = match.group(2)
+
+        # Parse arguments
+        kwargs = {}
+        if args_str.strip():
+            # Simple parsing: key='value' or key="value" or key=value
+            for arg_match in re.finditer(r"(\w+)\s*=\s*(?:'([^']*)'|\"([^\"]*)\"|(\S+))", args_str):
+                key = arg_match.group(1)
+                value = arg_match.group(2) or arg_match.group(3) or arg_match.group(4)
+                # Try to convert to appropriate type
+                if value.lower() == 'true':
+                    value = True
+                elif value.lower() == 'false':
+                    value = False
+                elif value.isdigit():
+                    value = int(value)
+                elif re.match(r'^[\d.]+$', value):
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass
+                kwargs[key] = value
+
+        # Execute tool
+        result = self.tools.execute(tool_name, **kwargs)
+        self._print_tool_result(tool_name, result)
+
+    def _print_tool_result(self, tool_name: str, result: dict):
+        """Pretty print tool execution result."""
+        print(f"\n🔧 Tool: {tool_name}")
+        print("-" * 40)
+
+        if result.get("success"):
+            print("✅ Success")
+            for key, value in result.items():
+                if key == "success":
+                    continue
+                if isinstance(value, str) and len(value) > 200:
+                    value = value[:200] + "..."
+                elif isinstance(value, list) and len(value) > 5:
+                    value = value[:5] + ["..."]
+                print(f"   {key}: {value}")
+        else:
+            print(f"❌ Failed: {result.get('error', 'Unknown error')}")
+            if result.get('expected_params'):
+                print(f"   Expected: {result['expected_params']}")
+            if result.get('example'):
+                print(f"   Example: {result['example']}")
+
+        print("-" * 40 + "\n")
     
     def _print_state(self):
         """Display current internal state."""
