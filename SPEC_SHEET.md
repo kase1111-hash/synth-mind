@@ -947,7 +947,8 @@ synth-mind/
 │   ├── logging.py                  # Logging setup
 │   ├── auth.py                     # JWT authentication
 │   ├── version_control.py          # Git VCS integration
-│   └── ssl_utils.py                # SSL/TLS certificate utilities
+│   ├── ssl_utils.py                # SSL/TLS certificate utilities
+│   └── rate_limiter.py             # API rate limiting
 │
 ├── dashboard/
 │   ├── server.py                   # WebSocket server
@@ -1132,11 +1133,84 @@ python utils/ssl_utils.py --info certs/server.crt
 python utils/ssl_utils.py --generate --hostname mydomain.com --days 365
 ```
 
+### Rate Limiting
+
+**Status:** ✅ Implemented
+**Files:** `utils/rate_limiter.py`, `dashboard/server.py`
+
+#### Overview
+
+API rate limiting protects the server from abuse and ensures fair resource usage. Uses a sliding window algorithm with configurable limits per endpoint tier.
+
+#### Rate Limit Tiers
+
+| Tier | Limit | Endpoints |
+|------|-------|-----------|
+| Strict | 5/min | `/api/auth/login`, `/api/auth/setup`, `/api/auth/refresh` |
+| Standard | 60/min | Most API endpoints |
+| Relaxed | 120/min | Read-only: `/`, `/timeline`, `/api/state`, `/api/timeline` |
+| WebSocket | 10/min | New `/ws` connections |
+
+#### CLI Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--no-rate-limit` | - | Disable rate limiting |
+| `--rate-limit-auth` | 5 | Limit for auth endpoints per minute |
+| `--rate-limit-api` | 60 | Limit for API endpoints per minute |
+| `--rate-limit-window` | 60 | Window size in seconds |
+
+#### Response Headers
+
+All responses include rate limit headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed |
+| `X-RateLimit-Remaining` | Requests remaining in window |
+| `X-RateLimit-Reset` | Unix timestamp when limit resets |
+
+#### Rate Limit Exceeded Response
+
+```json
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+
+{
+  "error": "Rate limit exceeded",
+  "retry_after": 60,
+  "limit": 5,
+  "message": "Too many requests. Please wait 60 seconds."
+}
+```
+
+#### API Endpoint
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/ratelimit/stats` | GET | Admin | Get rate limiting statistics |
+
+#### Usage Examples
+
+```bash
+# Default rate limiting (enabled)
+python dashboard/server.py
+
+# Disable rate limiting
+python dashboard/server.py --no-rate-limit
+
+# Custom limits
+python dashboard/server.py --rate-limit-auth 10 --rate-limit-api 100
+
+# Combined with other options
+python dashboard/server.py --ssl-dev --rate-limit-api 30
+```
+
 ### Production Checklist
 
 - [x] JWT authentication
 - [x] HTTPS/WSS encryption
-- [ ] Rate limiting on API endpoints
+- [x] Rate limiting on API endpoints
 - [x] Input validation
 - [x] CORS restrictions
 - [ ] Access logging
@@ -1168,6 +1242,7 @@ python utils/ssl_utils.py --generate --hostname mydomain.com --days 365
 - [x] Visual timeline/Gantt charts (interactive project visualization)
 - [x] Version control integration (Git auto-commit, rollback, changelog)
 - [x] HTTPS/WSS encryption (TLS 1.2+, self-signed cert generation)
+- [x] Rate limiting on API endpoints (sliding window, tiered limits)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS

@@ -27,6 +27,7 @@ except ImportError:
 
 from core.orchestrator import SynthOrchestrator
 from utils.auth import AuthManager, UserRole
+from utils.rate_limiter import RateLimiter, RateLimitConfig, create_rate_limit_middleware
 
 class DashboardServer:
     """WebSocket server for streaming internal state to dashboard."""
@@ -45,7 +46,9 @@ class DashboardServer:
     def __init__(self, orchestrator: SynthOrchestrator, port: int = 8080,
                  auth_enabled: bool = True, allowed_origins: list = None,
                  ssl_cert: str = None, ssl_key: str = None,
-                 ssl_context: ssl.SSLContext = None):
+                 ssl_context: ssl.SSLContext = None,
+                 rate_limit_enabled: bool = True,
+                 rate_limit_config: RateLimitConfig = None):
         """
         Initialize the dashboard server.
 
@@ -57,6 +60,8 @@ class DashboardServer:
             ssl_cert: Path to SSL certificate file (enables HTTPS)
             ssl_key: Path to SSL private key file
             ssl_context: Pre-configured SSLContext (overrides ssl_cert/ssl_key)
+            rate_limit_enabled: Enable rate limiting (default: True)
+            rate_limit_config: Custom rate limit configuration
         """
         self.orchestrator = orchestrator
         self.port = port
@@ -94,11 +99,23 @@ class DashboardServer:
         # Initialize authentication
         self.auth = AuthManager() if auth_enabled else None
 
-        # Create app with middleware
-        if auth_enabled:
-            self.app = web.Application(middlewares=[self._auth_middleware])
+        # Initialize rate limiter
+        self.rate_limit_enabled = rate_limit_enabled
+        if rate_limit_enabled:
+            config = rate_limit_config or RateLimitConfig()
+            self.rate_limiter = RateLimiter(config)
         else:
-            self.app = web.Application()
+            self.rate_limiter = None
+
+        # Build middleware stack
+        middlewares = []
+        if rate_limit_enabled and self.rate_limiter:
+            middlewares.append(create_rate_limit_middleware(self.rate_limiter))
+        if auth_enabled:
+            middlewares.append(self._auth_middleware)
+
+        # Create app with middleware
+        self.app = web.Application(middlewares=middlewares)
 
         # Setup routes
         self._setup_routes()
@@ -149,6 +166,9 @@ class DashboardServer:
         # Timeline / Gantt Chart API
         self.app.router.add_get('/timeline', self.serve_timeline)
         self.app.router.add_get('/api/timeline', self.get_timeline_data)
+
+        # Rate limiting API
+        self.app.router.add_get('/api/ratelimit/stats', self.ratelimit_stats)
 
         # Enable CORS with restricted origins (security fix)
         # Only allow localhost by default - configure allowed_origins for production
@@ -508,6 +528,32 @@ class DashboardServer:
                     "success": False,
                     "error": "Collaboration not available"
                 }, status=503)
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def ratelimit_stats(self, request):
+        """Get rate limiting statistics (admin only)."""
+        # Check admin permission
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.rate_limit_enabled or not self.rate_limiter:
+            return web.json_response({
+                "success": True,
+                "enabled": False,
+                "message": "Rate limiting is disabled"
+            })
+
+        try:
+            stats = self.rate_limiter.get_stats()
+            return web.json_response({
+                "success": True,
+                **stats
+            })
         except Exception as e:
             return web.json_response(
                 {"error": str(e), "success": False},
@@ -1209,6 +1255,16 @@ class DashboardServer:
         else:
             print(f"  Authentication: DISABLED")
 
+        # Show rate limiting status
+        if self.rate_limit_enabled and self.rate_limiter:
+            config = self.rate_limiter.config
+            print(f"  Rate Limiting: ENABLED")
+            print(f"    - Auth endpoints: {config.strict_limit}/min")
+            print(f"    - API endpoints: {config.standard_limit}/min")
+            print(f"    - Read-only: {config.relaxed_limit}/min")
+        else:
+            print(f"  Rate Limiting: DISABLED")
+
         print(f"{'='*60}\n")
 
         # Keep server running
@@ -1233,6 +1289,17 @@ async def main():
     ssl_group.add_argument('--ssl-dev', action='store_true',
                           help='Generate/use self-signed certificate for development')
 
+    # Rate limiting options
+    rate_group = parser.add_argument_group('Rate Limiting Options')
+    rate_group.add_argument('--no-rate-limit', action='store_true',
+                           help='Disable rate limiting')
+    rate_group.add_argument('--rate-limit-auth', type=int, default=5,
+                           help='Rate limit for auth endpoints (default: 5/min)')
+    rate_group.add_argument('--rate-limit-api', type=int, default=60,
+                           help='Rate limit for API endpoints (default: 60/min)')
+    rate_group.add_argument('--rate-limit-window', type=int, default=60,
+                           help='Rate limit window in seconds (default: 60)')
+
     args = parser.parse_args()
 
     # Handle SSL configuration
@@ -1255,6 +1322,17 @@ async def main():
     if (ssl_cert and not ssl_key) or (ssl_key and not ssl_cert):
         parser.error("Both --ssl-cert and --ssl-key are required for HTTPS")
 
+    # Configure rate limiting
+    rate_limit_config = None
+    if not args.no_rate_limit:
+        rate_limit_config = RateLimitConfig(
+            strict_limit=args.rate_limit_auth,
+            standard_limit=args.rate_limit_api,
+            relaxed_limit=args.rate_limit_api * 2,  # Double for read-only
+            window_seconds=args.rate_limit_window,
+            enabled=True
+        )
+
     print("Initializing Synth Mind with dashboard...")
 
     # Initialize orchestrator
@@ -1267,7 +1345,9 @@ async def main():
         port=args.port,
         auth_enabled=not args.no_auth,
         ssl_cert=ssl_cert,
-        ssl_key=ssl_key
+        ssl_key=ssl_key,
+        rate_limit_enabled=not args.no_rate_limit,
+        rate_limit_config=rate_limit_config
     )
 
     # Start both server and orchestrator
