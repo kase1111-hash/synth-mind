@@ -26,7 +26,7 @@ def print_banner():
     ║           Purpose | Calibration | Companionship          ║
     ║                                                           ║
     ╚═══════════════════════════════════════════════════════════╝
-    
+
     Commands:
       /state           - View internal state (valence, flow, metrics)
       /reflect         - Trigger meta-reflection
@@ -35,9 +35,11 @@ def print_banner():
       /project [desc]  - Start systematic project (GDIL)
       /project status  - View active project progress
       /resume project  - Resume paused project
+      /tools           - List available tools
+      /tool <name>     - Execute a tool (e.g., /tool calculator 2+2)
       /reset           - Clear session (keeps long-term identity)
       /quit            - Save and exit
-    
+
     """
     print(banner)
 

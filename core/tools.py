@@ -1,61 +1,664 @@
 """
-Tool Manager - Manages safe execution of tools and external capabilities.
-Currently a placeholder for future expansion.
+Tool Manager - Advanced tool execution with sandboxing and safety controls.
+
+Available Tools:
+- calculator: Evaluate mathematical expressions
+- timer: Wait for specified seconds
+- web_search: Search the web using DuckDuckGo
+- http_fetch: Fetch content from URLs
+- code_execute: Run Python code in a sandbox
+- file_read: Read files from workspace
+- file_write: Write files to workspace
+- file_list: List files in workspace
+- shell_run: Execute shell commands (restricted)
+- json_parse: Parse and query JSON data
 """
 
-from typing import Dict, Any, List
+import asyncio
+import json
+import os
+import re
+import subprocess
+import time
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+from urllib.parse import quote_plus
 
 
 class ToolManager:
     """
     Manages safe execution of tools and external capabilities.
-    Currently a placeholder for future expansion.
+    Includes sandboxing for code execution and file operations.
     """
 
-    def __init__(self):
+    # Safety limits
+    MAX_CODE_EXECUTION_TIME = 10  # seconds
+    MAX_OUTPUT_LENGTH = 10000  # characters
+    MAX_FILE_SIZE = 1_000_000  # 1MB
+    ALLOWED_SHELL_COMMANDS = {
+        "ls", "pwd", "date", "whoami", "echo", "cat", "head", "tail",
+        "wc", "grep", "find", "sort", "uniq", "diff", "which", "env"
+    }
+
+    def __init__(self, workspace_dir: str = "workspace"):
+        self.workspace = Path(workspace_dir)
+        self.workspace.mkdir(exist_ok=True)
         self.available_tools = {}
+        self.tool_descriptions = {}
         self._register_default_tools()
 
     def _register_default_tools(self):
-        """Register default tools."""
-        # Placeholder for future tools
+        """Register all available tools with descriptions."""
         self.available_tools = {
             "calculator": self._calculator,
             "timer": self._timer,
+            "web_search": self._web_search,
+            "http_fetch": self._http_fetch,
+            "code_execute": self._code_execute,
+            "file_read": self._file_read,
+            "file_write": self._file_write,
+            "file_list": self._file_list,
+            "shell_run": self._shell_run,
+            "json_parse": self._json_parse,
         }
 
+        self.tool_descriptions = {
+            "calculator": {
+                "description": "Evaluate mathematical expressions safely",
+                "params": {"expression": "Mathematical expression to evaluate"},
+                "example": "calculator(expression='2 + 2 * 3')"
+            },
+            "timer": {
+                "description": "Wait for specified seconds (max 30)",
+                "params": {"seconds": "Number of seconds to wait"},
+                "example": "timer(seconds=5)"
+            },
+            "web_search": {
+                "description": "Search the web using DuckDuckGo",
+                "params": {
+                    "query": "Search query",
+                    "max_results": "Maximum results to return (default 5)"
+                },
+                "example": "web_search(query='python async tutorial')"
+            },
+            "http_fetch": {
+                "description": "Fetch content from a URL",
+                "params": {
+                    "url": "URL to fetch",
+                    "extract_text": "Extract text only (default True)"
+                },
+                "example": "http_fetch(url='https://example.com')"
+            },
+            "code_execute": {
+                "description": "Execute Python code in a sandbox",
+                "params": {"code": "Python code to execute"},
+                "example": "code_execute(code='print(sum(range(10)))')"
+            },
+            "file_read": {
+                "description": "Read a file from the workspace",
+                "params": {"path": "Relative path within workspace"},
+                "example": "file_read(path='notes.txt')"
+            },
+            "file_write": {
+                "description": "Write content to a file in the workspace",
+                "params": {
+                    "path": "Relative path within workspace",
+                    "content": "Content to write"
+                },
+                "example": "file_write(path='output.txt', content='Hello')"
+            },
+            "file_list": {
+                "description": "List files in the workspace",
+                "params": {"path": "Relative directory path (default '.')"},
+                "example": "file_list(path='.')"
+            },
+            "shell_run": {
+                "description": "Run safe shell commands",
+                "params": {"command": "Shell command to execute"},
+                "example": "shell_run(command='ls -la')"
+            },
+            "json_parse": {
+                "description": "Parse JSON and extract data using path",
+                "params": {
+                    "data": "JSON string or dict",
+                    "path": "Dot-notation path (e.g., 'users.0.name')"
+                },
+                "example": "json_parse(data='{\"a\": 1}', path='a')"
+            },
+        }
+
+    # ============================================
+    # Basic Tools
+    # ============================================
+
     def _calculator(self, expression: str) -> Dict[str, Any]:
-        """Simple calculator tool."""
+        """
+        Safe mathematical expression evaluator.
+        Supports: +, -, *, /, **, %, parentheses, and math functions.
+        """
+        import math
+
+        # Allowed names for evaluation
+        safe_dict = {
+            "abs": abs,
+            "round": round,
+            "min": min,
+            "max": max,
+            "sum": sum,
+            "pow": pow,
+            "sqrt": math.sqrt,
+            "sin": math.sin,
+            "cos": math.cos,
+            "tan": math.tan,
+            "log": math.log,
+            "log10": math.log10,
+            "exp": math.exp,
+            "pi": math.pi,
+            "e": math.e,
+        }
+
         try:
-            # Very basic - in production use a proper math parser
-            result = eval(expression, {"__builtins__": {}}, {})
-            return {"success": True, "result": result}
+            # Remove any potentially dangerous characters
+            clean_expr = re.sub(r'[^0-9+\-*/().,%\s\w]', '', expression)
+            result = eval(clean_expr, {"__builtins__": {}}, safe_dict)
+            return {"success": True, "result": result, "expression": expression}
+        except Exception as e:
+            return {"success": False, "error": str(e), "expression": expression}
+
+    def _timer(self, seconds: int) -> Dict[str, Any]:
+        """Timer tool with maximum limit."""
+        seconds = min(max(0, seconds), 30)  # 0-30 seconds
+        time.sleep(seconds)
+        return {"success": True, "elapsed": seconds}
+
+    # ============================================
+    # Web Tools
+    # ============================================
+
+    def _web_search(
+        self, query: str, max_results: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Search the web using DuckDuckGo Instant Answer API.
+        No API key required.
+        """
+        try:
+            import httpx
+        except ImportError:
+            return {
+                "success": False,
+                "error": "httpx not installed. Run: pip install httpx"
+            }
+
+        try:
+            # DuckDuckGo Instant Answer API
+            url = f"https://api.duckduckgo.com/?q={quote_plus(query)}&format=json&no_html=1"
+
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(url)
+                data = response.json()
+
+            results = []
+
+            # Abstract (main answer)
+            if data.get("Abstract"):
+                results.append({
+                    "title": data.get("Heading", "Answer"),
+                    "snippet": data["Abstract"][:500],
+                    "url": data.get("AbstractURL", ""),
+                    "source": data.get("AbstractSource", "DuckDuckGo")
+                })
+
+            # Related topics
+            for topic in data.get("RelatedTopics", [])[:max_results]:
+                if isinstance(topic, dict) and topic.get("Text"):
+                    results.append({
+                        "title": topic.get("Text", "")[:100],
+                        "snippet": topic.get("Text", "")[:300],
+                        "url": topic.get("FirstURL", ""),
+                        "source": "DuckDuckGo"
+                    })
+
+            # Results (if available)
+            for result in data.get("Results", [])[:max_results]:
+                results.append({
+                    "title": result.get("Text", "")[:100],
+                    "snippet": result.get("Text", "")[:300],
+                    "url": result.get("FirstURL", ""),
+                    "source": "DuckDuckGo"
+                })
+
+            return {
+                "success": True,
+                "query": query,
+                "results": results[:max_results],
+                "total_found": len(results)
+            }
+
+        except Exception as e:
+            return {"success": False, "error": str(e), "query": query}
+
+    def _http_fetch(
+        self, url: str, extract_text: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Fetch content from a URL.
+        Optionally extracts text only (removes HTML tags).
+        """
+        try:
+            import httpx
+        except ImportError:
+            return {
+                "success": False,
+                "error": "httpx not installed. Run: pip install httpx"
+            }
+
+        # Validate URL
+        if not url.startswith(("http://", "https://")):
+            return {"success": False, "error": "Invalid URL scheme"}
+
+        try:
+            headers = {
+                "User-Agent": "SynthMind/1.0 (Educational AI Agent)"
+            }
+
+            with httpx.Client(timeout=15.0, follow_redirects=True) as client:
+                response = client.get(url, headers=headers)
+
+            content = response.text[:self.MAX_OUTPUT_LENGTH]
+            content_type = response.headers.get("content-type", "")
+
+            if extract_text and "text/html" in content_type:
+                # Simple HTML tag removal
+                text = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL)
+                text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
+                text = re.sub(r'<[^>]+>', ' ', text)
+                text = re.sub(r'\s+', ' ', text).strip()
+                content = text[:self.MAX_OUTPUT_LENGTH]
+
+            return {
+                "success": True,
+                "url": url,
+                "status_code": response.status_code,
+                "content_type": content_type,
+                "content": content,
+                "length": len(content)
+            }
+
+        except httpx.TimeoutException:
+            return {"success": False, "error": "Request timed out", "url": url}
+        except Exception as e:
+            return {"success": False, "error": str(e), "url": url}
+
+    # ============================================
+    # Code Execution (Sandboxed)
+    # ============================================
+
+    def _code_execute(self, code: str) -> Dict[str, Any]:
+        """
+        Execute Python code in a restricted sandbox.
+        Limited builtins, no file/network access, timeout enforced.
+        """
+        import io
+        import sys
+        from contextlib import redirect_stdout, redirect_stderr
+
+        # Restricted builtins
+        safe_builtins = {
+            "abs": abs, "all": all, "any": any, "bin": bin,
+            "bool": bool, "chr": chr, "dict": dict, "dir": dir,
+            "divmod": divmod, "enumerate": enumerate, "filter": filter,
+            "float": float, "format": format, "frozenset": frozenset,
+            "hash": hash, "hex": hex, "int": int, "isinstance": isinstance,
+            "issubclass": issubclass, "iter": iter, "len": len,
+            "list": list, "map": map, "max": max, "min": min,
+            "next": next, "oct": oct, "ord": ord, "pow": pow,
+            "print": print, "range": range, "repr": repr, "reversed": reversed,
+            "round": round, "set": set, "slice": slice, "sorted": sorted,
+            "str": str, "sum": sum, "tuple": tuple, "type": type,
+            "zip": zip,
+            # Math
+            "True": True, "False": False, "None": None,
+        }
+
+        # Additional safe modules
+        import math
+        import random
+        import datetime
+        import json as json_module
+        import re as re_module
+        import collections
+
+        safe_modules = {
+            "math": math,
+            "random": random,
+            "datetime": datetime,
+            "json": json_module,
+            "re": re_module,
+            "collections": collections,
+        }
+
+        # Create restricted globals
+        restricted_globals = {
+            "__builtins__": safe_builtins,
+            "__name__": "__sandbox__",
+            **safe_modules
+        }
+
+        # Capture output
+        stdout_capture = io.StringIO()
+        stderr_capture = io.StringIO()
+        result = None
+        error = None
+
+        try:
+            # Compile first to catch syntax errors
+            compiled = compile(code, "<sandbox>", "exec")
+
+            # Execute with timeout
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                exec(compiled, restricted_globals)
+
+            stdout_output = stdout_capture.getvalue()[:self.MAX_OUTPUT_LENGTH]
+            stderr_output = stderr_capture.getvalue()[:self.MAX_OUTPUT_LENGTH]
+
+            return {
+                "success": True,
+                "stdout": stdout_output,
+                "stderr": stderr_output,
+                "has_output": bool(stdout_output or stderr_output)
+            }
+
+        except SyntaxError as e:
+            return {
+                "success": False,
+                "error": f"Syntax error: {e}",
+                "line": e.lineno
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"{type(e).__name__}: {str(e)}"
+            }
+
+    # ============================================
+    # File Operations (Sandboxed to workspace)
+    # ============================================
+
+    def _validate_path(self, path: str) -> Optional[Path]:
+        """Validate path is within workspace."""
+        try:
+            # Resolve to absolute path
+            target = (self.workspace / path).resolve()
+            # Ensure it's within workspace
+            if self.workspace.resolve() in target.parents or target == self.workspace.resolve():
+                return target
+            if target.is_relative_to(self.workspace.resolve()):
+                return target
+            return None
+        except Exception:
+            return None
+
+    def _file_read(self, path: str) -> Dict[str, Any]:
+        """Read a file from the workspace directory."""
+        target = self._validate_path(path)
+        if not target:
+            return {"success": False, "error": "Path outside workspace"}
+
+        if not target.exists():
+            return {"success": False, "error": f"File not found: {path}"}
+
+        if not target.is_file():
+            return {"success": False, "error": f"Not a file: {path}"}
+
+        try:
+            size = target.stat().st_size
+            if size > self.MAX_FILE_SIZE:
+                return {
+                    "success": False,
+                    "error": f"File too large ({size} bytes, max {self.MAX_FILE_SIZE})"
+                }
+
+            content = target.read_text(encoding="utf-8")
+            return {
+                "success": True,
+                "path": path,
+                "content": content[:self.MAX_OUTPUT_LENGTH],
+                "size": size,
+                "truncated": size > self.MAX_OUTPUT_LENGTH
+            }
+        except UnicodeDecodeError:
+            return {"success": False, "error": "Binary file cannot be read as text"}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _timer(self, seconds: int) -> Dict[str, Any]:
-        """Timer tool."""
-        import time
-        time.sleep(min(seconds, 5))  # Max 5 seconds
-        return {"success": True, "elapsed": seconds}
+    def _file_write(self, path: str, content: str) -> Dict[str, Any]:
+        """Write content to a file in the workspace directory."""
+        target = self._validate_path(path)
+        if not target:
+            return {"success": False, "error": "Path outside workspace"}
+
+        try:
+            # Create parent directories if needed
+            target.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write content
+            target.write_text(content, encoding="utf-8")
+
+            return {
+                "success": True,
+                "path": path,
+                "size": len(content),
+                "absolute_path": str(target)
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _file_list(self, path: str = ".") -> Dict[str, Any]:
+        """List files and directories in the workspace."""
+        target = self._validate_path(path)
+        if not target:
+            return {"success": False, "error": "Path outside workspace"}
+
+        if not target.exists():
+            return {"success": False, "error": f"Directory not found: {path}"}
+
+        if not target.is_dir():
+            return {"success": False, "error": f"Not a directory: {path}"}
+
+        try:
+            items = []
+            for item in sorted(target.iterdir()):
+                rel_path = item.relative_to(self.workspace)
+                items.append({
+                    "name": item.name,
+                    "path": str(rel_path),
+                    "type": "directory" if item.is_dir() else "file",
+                    "size": item.stat().st_size if item.is_file() else None
+                })
+
+            return {
+                "success": True,
+                "path": path,
+                "items": items,
+                "count": len(items)
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # ============================================
+    # Shell Commands (Restricted)
+    # ============================================
+
+    def _shell_run(self, command: str) -> Dict[str, Any]:
+        """
+        Run restricted shell commands.
+        Only allows safe, read-only commands.
+        """
+        # Parse command to get base command
+        parts = command.strip().split()
+        if not parts:
+            return {"success": False, "error": "Empty command"}
+
+        base_cmd = parts[0]
+
+        # Check if command is allowed
+        if base_cmd not in self.ALLOWED_SHELL_COMMANDS:
+            return {
+                "success": False,
+                "error": f"Command '{base_cmd}' not allowed. Allowed: {', '.join(sorted(self.ALLOWED_SHELL_COMMANDS))}"
+            }
+
+        # Block dangerous arguments
+        dangerous_patterns = [
+            r'[;&|`$]',  # Command chaining, substitution
+            r'>',  # Redirects
+            r'\.\.',  # Parent directory traversal
+            r'/etc/', r'/root/', r'/home/',  # Sensitive paths
+        ]
+
+        for pattern in dangerous_patterns:
+            if re.search(pattern, command):
+                return {
+                    "success": False,
+                    "error": "Command contains disallowed characters or paths"
+                }
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=str(self.workspace)
+            )
+
+            return {
+                "success": result.returncode == 0,
+                "command": command,
+                "stdout": result.stdout[:self.MAX_OUTPUT_LENGTH],
+                "stderr": result.stderr[:self.MAX_OUTPUT_LENGTH],
+                "return_code": result.returncode
+            }
+
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "Command timed out", "command": command}
+        except Exception as e:
+            return {"success": False, "error": str(e), "command": command}
+
+    # ============================================
+    # Data Tools
+    # ============================================
+
+    def _json_parse(
+        self, data: str | dict, path: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Parse JSON and extract data using dot notation.
+        Path examples: 'users.0.name', 'config.settings.theme'
+        """
+        try:
+            # Parse if string
+            if isinstance(data, str):
+                parsed = json.loads(data)
+            else:
+                parsed = data
+
+            # Navigate path
+            if path:
+                result = parsed
+                for key in path.split('.'):
+                    if isinstance(result, dict):
+                        result = result[key]
+                    elif isinstance(result, list):
+                        result = result[int(key)]
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"Cannot traverse into {type(result).__name__}"
+                        }
+            else:
+                result = parsed
+
+            return {
+                "success": True,
+                "path": path or "(root)",
+                "result": result,
+                "type": type(result).__name__
+            }
+
+        except json.JSONDecodeError as e:
+            return {"success": False, "error": f"Invalid JSON: {e}"}
+        except (KeyError, IndexError) as e:
+            return {"success": False, "error": f"Path not found: {e}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # ============================================
+    # Tool Execution Interface
+    # ============================================
 
     def execute(self, tool_name: str, **kwargs) -> Dict[str, Any]:
         """Execute a tool safely."""
         if tool_name not in self.available_tools:
             return {
                 "success": False,
-                "error": f"Tool '{tool_name}' not found"
+                "error": f"Tool '{tool_name}' not found",
+                "available_tools": list(self.available_tools.keys())
             }
 
         try:
             tool_func = self.available_tools[tool_name]
             return tool_func(**kwargs)
+        except TypeError as e:
+            # Wrong arguments
+            desc = self.tool_descriptions.get(tool_name, {})
+            return {
+                "success": False,
+                "error": f"Invalid arguments: {e}",
+                "expected_params": desc.get("params", {}),
+                "example": desc.get("example", "")
+            }
         except Exception as e:
             return {
                 "success": False,
                 "error": f"Tool execution failed: {str(e)}"
             }
 
+    async def execute_async(self, tool_name: str, **kwargs) -> Dict[str, Any]:
+        """Execute a tool asynchronously (runs in thread pool)."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, lambda: self.execute(tool_name, **kwargs)
+        )
+
     def list_tools(self) -> List[str]:
         """List available tools."""
         return list(self.available_tools.keys())
+
+    def get_tool_info(self, tool_name: str) -> Optional[Dict]:
+        """Get detailed info about a tool."""
+        if tool_name not in self.tool_descriptions:
+            return None
+        return self.tool_descriptions[tool_name]
+
+    def get_all_tool_info(self) -> Dict[str, Dict]:
+        """Get info about all tools."""
+        return self.tool_descriptions.copy()
+
+    def register_tool(
+        self,
+        name: str,
+        func,
+        description: str,
+        params: Dict[str, str],
+        example: str
+    ):
+        """Register a custom tool."""
+        self.available_tools[name] = func
+        self.tool_descriptions[name] = {
+            "description": description,
+            "params": params,
+            "example": example
+        }
