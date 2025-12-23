@@ -49,7 +49,7 @@ Create config/peers.txt with peer endpoints:
 http://peer1.example.com/api/generate
 http://peer2.example.com/api/generate
 
-**For multi-instance setup**, see [PEER_SETUP.md](PEER_SETUP.md) for detailed instructions on configuring multiple synth-mind instances to work together.
+**For multi-instance setup**, see [PEER_SETUP.md](docs/PEER_SETUP.md) for detailed instructions on configuring multiple synth-mind instances to work together.
 Usage
 Basic Usage
 bashpython run_synth.py
@@ -146,7 +146,7 @@ Background tasks: Social companionship checks every 10 min when idle
 Roadmap
 
  Voice interface (Whisper + TTS)
- ✅ Multi-agent collaboration protocols (see [PEER_SETUP.md](PEER_SETUP.md))
+ ✅ Multi-agent collaboration protocols (see [PEER_SETUP.md](docs/PEER_SETUP.md))
  Advanced tool integration (code execution, web search)
  Fine-tuned embedding models for better memory
  ✅ Visualization dashboard for internal state

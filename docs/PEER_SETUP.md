@@ -310,6 +310,6 @@ Create a dashboard that shows peer interaction patterns, shared culture evolutio
 5. Add authentication for production deployments
 
 For more information, see:
-- [README.md](README.md) - Main documentation
+- [README.md](../README.md) - Main documentation
 - [QUICKSTART.md](QUICKSTART.md) - Getting started
-- [dashboard/README_DASHBOARD.md](dashboard/README_DASHBOARD.md) - Dashboard features
+- [Dashboard README](../dashboard/README_DASHBOARD.md) - Dashboard features
