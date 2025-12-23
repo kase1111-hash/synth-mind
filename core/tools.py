@@ -16,6 +16,7 @@ Available Tools:
 
 import asyncio
 import json
+import multiprocessing
 import os
 import re
 import shlex
@@ -307,13 +308,85 @@ class ToolManager:
     def _code_execute(self, code: str) -> Dict[str, Any]:
         """
         Execute Python code in a restricted sandbox.
-        Limited builtins, no file/network access, timeout enforced.
+        Limited builtins, no file/network access, timeout ENFORCED via multiprocessing.
+        """
+        # First, compile to catch syntax errors before spawning process
+        try:
+            compile(code, "<sandbox>", "exec")
+        except SyntaxError as e:
+            return {
+                "success": False,
+                "error": f"Syntax error: {e}",
+                "line": e.lineno
+            }
+
+        # Use multiprocessing to enforce timeout
+        result_queue = multiprocessing.Queue()
+        process = multiprocessing.Process(
+            target=self._sandbox_worker,
+            args=(code, result_queue, self.MAX_OUTPUT_LENGTH)
+        )
+
+        try:
+            process.start()
+            # ACTUALLY ENFORCE TIMEOUT - this was missing before!
+            process.join(timeout=self.MAX_CODE_EXECUTION_TIME)
+
+            if process.is_alive():
+                # Process exceeded timeout - kill it
+                process.terminate()
+                process.join(timeout=1)
+                if process.is_alive():
+                    # Force kill if still running
+                    process.kill()
+                    process.join()
+                return {
+                    "success": False,
+                    "error": f"Execution timed out after {self.MAX_CODE_EXECUTION_TIME} seconds",
+                    "timed_out": True
+                }
+
+            # Get result from queue
+            if not result_queue.empty():
+                return result_queue.get_nowait()
+            else:
+                return {
+                    "success": False,
+                    "error": "No result returned from sandbox"
+                }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Sandbox error: {type(e).__name__}: {str(e)}"
+            }
+        finally:
+            # Ensure process is cleaned up
+            if process.is_alive():
+                process.kill()
+                process.join()
+
+    @staticmethod
+    def _sandbox_worker(code: str, result_queue: multiprocessing.Queue, max_output: int):
+        """
+        Worker function that runs in a separate process.
+        This provides true isolation and allows the parent to kill it on timeout.
         """
         import io
         import sys
+        import resource
         from contextlib import redirect_stdout, redirect_stderr
 
-        # Restricted builtins
+        # Set resource limits (Unix only) - prevents memory bombs
+        try:
+            # Limit memory to 100MB
+            resource.setrlimit(resource.RLIMIT_AS, (100 * 1024 * 1024, 100 * 1024 * 1024))
+            # Limit CPU time to 10 seconds
+            resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
+        except (ValueError, resource.error):
+            pass  # Not available on all systems
+
+        # Restricted builtins - no dangerous operations
         safe_builtins = {
             "abs": abs, "all": all, "any": any, "bin": bin,
             "bool": bool, "chr": chr, "dict": dict, "dir": dir,
@@ -327,11 +400,10 @@ class ToolManager:
             "round": round, "set": set, "slice": slice, "sorted": sorted,
             "str": str, "sum": sum, "tuple": tuple, "type": type,
             "zip": zip,
-            # Math
             "True": True, "False": False, "None": None,
         }
 
-        # Additional safe modules
+        # Safe modules only
         import math
         import random
         import datetime
@@ -348,48 +420,40 @@ class ToolManager:
             "collections": collections,
         }
 
-        # Create restricted globals
+        # Restricted import that only allows safe modules
+        def restricted_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name in safe_modules:
+                return safe_modules[name]
+            raise ImportError(f"Module '{name}' is not allowed in sandbox")
+
+        # Add restricted import to builtins
+        safe_builtins["__import__"] = restricted_import
+
         restricted_globals = {
             "__builtins__": safe_builtins,
             "__name__": "__sandbox__",
             **safe_modules
         }
 
-        # Capture output
         stdout_capture = io.StringIO()
         stderr_capture = io.StringIO()
-        result = None
-        error = None
 
         try:
-            # Compile first to catch syntax errors
             compiled = compile(code, "<sandbox>", "exec")
-
-            # Execute with timeout
             with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
                 exec(compiled, restricted_globals)
 
-            stdout_output = stdout_capture.getvalue()[:self.MAX_OUTPUT_LENGTH]
-            stderr_output = stderr_capture.getvalue()[:self.MAX_OUTPUT_LENGTH]
-
-            return {
+            result_queue.put({
                 "success": True,
-                "stdout": stdout_output,
-                "stderr": stderr_output,
-                "has_output": bool(stdout_output or stderr_output)
-            }
-
-        except SyntaxError as e:
-            return {
-                "success": False,
-                "error": f"Syntax error: {e}",
-                "line": e.lineno
-            }
+                "stdout": stdout_capture.getvalue()[:max_output],
+                "stderr": stderr_capture.getvalue()[:max_output],
+                "has_output": bool(stdout_capture.getvalue() or stderr_capture.getvalue())
+            })
         except Exception as e:
-            return {
+            result_queue.put({
                 "success": False,
                 "error": f"{type(e).__name__}: {str(e)}"
-            }
+            })
 
     # ============================================
     # File Operations (Sandboxed to workspace)

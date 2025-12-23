@@ -16,7 +16,7 @@ This security assessment covers the Synth Mind codebase with focus on OWASP Top 
 | Severity | Count | Status |
 |----------|-------|--------|
 | Critical | 1 | ✅ FIXED |
-| High | 1 | Open |
+| High | 1 | ✅ FIXED |
 | Medium | 3 | Open |
 | Low | 2 | Open |
 
@@ -66,28 +66,46 @@ result = subprocess.run(
 
 ## High Findings
 
-### 2. Code Execution Sandbox Missing Timeout Enforcement
+### 2. Code Execution Sandbox Missing Timeout Enforcement - ✅ FIXED
 
-**File:** `core/tools.py:297-382`
-**Severity:** HIGH
+**File:** `core/tools.py:308-456`
+**Severity:** HIGH (was)
 **CVSS Score:** 7.5
+**Status:** ✅ **FIXED on 2025-12-23**
 
-**Description:**
-The `_code_execute` function claims to execute code with a timeout but no actual timeout mechanism is implemented. This allows denial-of-service through infinite loops.
+**Original Issue:**
+The `_code_execute` function claimed to execute code with a timeout but no actual timeout mechanism was implemented.
 
+**Fix Applied:**
+1. ✅ Implemented multiprocessing-based execution with real timeout
+2. ✅ Added resource limits (100MB memory, 10s CPU time)
+3. ✅ Added restricted `__import__` that only allows safe modules
+4. ✅ Process is forcefully killed if timeout exceeded
+
+**Fixed Code:**
 ```python
-# Comment says "Execute with timeout" but no timeout is actually enforced
-with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-    exec(compiled, restricted_globals)  # Can run forever
+process.join(timeout=self.MAX_CODE_EXECUTION_TIME)
+if process.is_alive():
+    process.terminate()
+    process.join(timeout=1)
+    if process.is_alive():
+        process.kill()  # Force kill
 ```
 
-**Impact:**
-- Denial of service via infinite loops
-- Resource exhaustion (CPU, memory)
+**Resource Limits (Unix):**
+```python
+resource.setrlimit(resource.RLIMIT_AS, (100 * 1024 * 1024, 100 * 1024 * 1024))
+resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
+```
 
-**Recommendation:**
-- Implement actual timeout using `signal.alarm()` or `multiprocessing` with timeout
-- Add memory limits using `resource.setrlimit()`
+**Verification Tests Passed:**
+- Normal code execution ✓
+- Math module import ✓
+- Syntax error handling ✓
+- Runtime error handling ✓
+- Dangerous builtins blocked (open) ✓
+- Unsafe import blocked (os) ✓
+- **Infinite loop timeout enforced (10s)** ✓
 
 ---
 
@@ -229,7 +247,7 @@ The codebase demonstrates several security best practices:
 | Priority | Action | Status |
 |----------|--------|--------|
 | ~~Immediate~~ | ~~Fix command injection in `_shell_run`~~ | ✅ FIXED |
-| Immediate | Implement actual timeout in `_code_execute` | Open |
+| ~~Immediate~~ | ~~Implement actual timeout in `_code_execute`~~ | ✅ FIXED |
 | High | Restrict CORS origins for production | Open |
 | Medium | Replace `eval()` with proper math parser | Open |
 | Medium | Remove auto-pip-install behavior | Open |
