@@ -1,6 +1,7 @@
 """
 Social Companionship Layer
 Enables safe peer-to-peer interaction between agent instances.
+Includes federated learning for privacy-preserving knowledge sharing.
 """
 
 import time
@@ -8,12 +9,16 @@ import random
 import httpx
 from typing import List, Dict, Optional
 
+from .federated_learning import FederatedLearningLayer, SharedPattern
+
+
 class SocialCompanionshipLayer:
     """
     Implements social grounding through background peer exchanges.
     Never exposes user data - only shares anonymized patterns.
+    Integrates federated learning for distributed knowledge.
     """
-    
+
     def __init__(
         self,
         llm,
@@ -21,17 +26,30 @@ class SocialCompanionshipLayer:
         emotion_regulator,
         temporal_purpose,
         safe_peer_endpoints: List[str] = [],
-        idle_threshold_minutes: int = 8
+        idle_threshold_minutes: int = 8,
+        federated_sync_interval: int = 30,
+        enable_federated_learning: bool = True
     ):
         self.llm = llm
         self.memory = memory
         self.emotion = emotion_regulator
         self.temporal = temporal_purpose
-        
+
         self.peers = safe_peer_endpoints
         self.idle_threshold = idle_threshold_minutes
         self.last_social_ping = time.time()
         self.shared_culture = self._load_shared_culture()
+
+        # Federated learning layer
+        self.federated_enabled = enable_federated_learning
+        self.federated = None
+        if enable_federated_learning:
+            self.federated = FederatedLearningLayer(
+                memory=memory,
+                llm=llm,
+                peer_endpoints=safe_peer_endpoints,
+                sync_interval_minutes=federated_sync_interval
+            )
     
     def _load_shared_culture(self) -> str:
         """Load or bootstrap shared cultural context."""
@@ -166,5 +184,87 @@ Output only the insight.
                 nuance = random.choice(phrases[-3:])  # Recent phrases
                 if len(nuance) < 100:
                     return draft_response + f" ({nuance})"
-        
+
         return draft_response
+
+    # ============================================
+    # Federated Learning Integration
+    # ============================================
+
+    async def run_federated_sync(self) -> Optional[Dict]:
+        """
+        Run federated learning sync if enabled and due.
+        Returns sync results or None if not run.
+        """
+        if not self.federated_enabled or not self.federated:
+            return None
+
+        if not self.federated.should_sync():
+            return None
+
+        try:
+            results = await self.federated.sync_round()
+
+            # Store sync event
+            self.memory.store_episodic(
+                event="federated_sync",
+                content={
+                    "round": results["round"],
+                    "peers_synced": results["peers_synced"],
+                    "patterns_aggregated": results["patterns_aggregated"]
+                },
+                valence=0.5 if results["peers_synced"] > 0 else 0.3
+            )
+
+            return results
+
+        except Exception as e:
+            print(f"⚠️  Federated sync failed: {e}")
+            return None
+
+    async def receive_federated_update(self, update_data: Dict) -> Dict:
+        """
+        Receive a federated update from a peer.
+        Used by the API endpoint.
+        """
+        if not self.federated_enabled or not self.federated:
+            return {"success": False, "error": "Federated learning not enabled"}
+
+        return await self.federated.receive_update(update_data)
+
+    def get_federated_patterns_for_query(self, query: str) -> List[Dict]:
+        """
+        Get relevant federated patterns to enhance response.
+        Returns patterns that may help with the query.
+        """
+        if not self.federated_enabled or not self.federated:
+            return []
+
+        similar = self.federated.get_pattern_similarity(query)
+        return [
+            {
+                "pattern_type": p.pattern_type,
+                "success_rate": p.success_rate,
+                "confidence": p.confidence,
+                "similarity": sim
+            }
+            for p, sim in similar
+        ]
+
+    def get_federated_stats(self) -> Optional[Dict]:
+        """Get federated learning statistics."""
+        if not self.federated_enabled or not self.federated:
+            return None
+        return self.federated.get_stats()
+
+    async def run_background_cycle(self):
+        """
+        Combined background cycle for social and federated activities.
+        Should be called periodically.
+        """
+        # Run social companionship if idle
+        if self.is_idle_enough():
+            await self.initiate_companionship_cycle()
+
+        # Run federated sync if due
+        await self.run_federated_sync()

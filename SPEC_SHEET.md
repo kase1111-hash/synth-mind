@@ -21,6 +21,8 @@
 | Self-Healing (Query Rating) | ✅ Complete | Logging + harvest utility implemented |
 | Advanced Tools | ✅ Complete | 10 tools with sandboxing |
 | Memory Embeddings | ✅ Complete | sentence-transformers + OpenAI fallback |
+| Federated Learning | ✅ Complete | Privacy-preserving pattern sharing |
+| Multiple Concurrent Projects | ✅ Complete | GDIL multi-project with switching |
 
 ### Detailed Component Status
 
@@ -64,17 +66,20 @@
 | Semantic Search | `core/memory.py` | `search_semantic()`, `get_related_memories()` |
 | Grounding Confidence | `core/memory.py` | Real similarity-based confidence scoring |
 | Coherence Drift Detection | `core/memory.py` | Context embedding analysis |
+| Federated Learning | `psychological/federated_learning.py` | Privacy-preserving pattern sharing (450+ lines) |
+| Federated Integration | `psychological/social_companionship.py` | Social layer + federated sync |
+| Federated API | `dashboard/server.py` | `/api/federated/receive`, `/api/federated/stats` |
+| Multi-Project GDIL | `psychological/goal_directed_iteration.py` | Concurrent projects, switching, persistence |
+| Multi-Project CLI | `core/orchestrator.py` | `/projects`, `/project switch`, `/project pause`, `/project archive` |
 
 #### ❌ Not Implemented (Design/Roadmap Only)
 
 | Feature | Documentation | Notes |
 |---------|---------------|-------|
 | Voice Interface | README roadmap | Whisper + TTS not integrated |
-| Multiple Concurrent Projects | GDIL_COMPLETE.md | Single project only |
 | Project Templates | GDIL_COMPLETE.md | Not implemented |
 | Visual Timeline/Gantt | GDIL_COMPLETE.md | Not implemented |
 | Version Control Integration | GDIL_COMPLETE.md | No Git integration |
-| Federated Learning | README roadmap | Not implemented |
 
 ---
 
@@ -289,6 +294,41 @@
 | `iteration_threshold` | 0.1 | Minimum improvement to continue |
 | `max_iterations` | 10 | Safety cap on iterations |
 | `stall_iterations` | 3 | Low-progress iterations before exit |
+| `max_concurrent_projects` | 5 | Maximum active projects |
+
+### Multiple Concurrent Projects
+
+**Status:** ✅ Implemented
+
+Manage up to 5 concurrent projects with seamless context switching.
+
+#### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/projects` | List all active/paused projects with status |
+| `/project switch <id>` | Switch to a different project (auto-pauses current) |
+| `/project pause` | Pause current project without archiving |
+| `/project archive <id>` | Archive a project (removes from active list) |
+
+#### Project States
+
+| State | Description |
+|-------|-------------|
+| `initialization` | Gathering requirements, asking clarifying questions |
+| `planning` | Generating roadmap and subtasks |
+| `iteration` | Actively working on subtasks |
+| `paused` | Temporarily paused, can resume |
+| `exit` | Completed or stalled |
+| `archived` | Moved to history, not visible in `/projects` |
+
+#### Features
+
+- **Automatic Naming**: Projects are auto-named from user input
+- **Short ID Matching**: Use last few characters of ID (e.g., `1234567890` → `890`)
+- **Persistence**: Projects survive restarts via memory system
+- **Auto-Pause**: Switching projects pauses the current one
+- **Context Preservation**: Each project maintains full state including iterations
 
 ---
 
@@ -380,6 +420,60 @@ POST /api/generate
 |------|---------|
 | `config/peers.txt` | List of peer endpoint URLs |
 | `.env` | `SOCIAL_IDLE_THRESHOLD_MIN` setting |
+
+---
+
+## Federated Learning System
+
+**Status:** ✅ Implemented
+**File:** `psychological/federated_learning.py`
+
+### Overview
+
+Privacy-preserving knowledge sharing between synth-mind instances. Enables distributed learning without exposing user data.
+
+### Key Components
+
+| Component | Description |
+|-----------|-------------|
+| `SharedPattern` | Anonymized learnable pattern with embedding |
+| `PrivacyFilter` | Differential privacy + k-anonymity enforcement |
+| `PatternAggregator` | Federated averaging for consensus patterns |
+| `FederatedLearningLayer` | Main coordinator for pattern extraction/sharing |
+
+### Privacy Protections
+
+| Protection | Implementation |
+|------------|----------------|
+| Differential Privacy | Laplacian noise (ε=1.0 default) |
+| K-Anonymity | Minimum 5 observations before sharing |
+| Hash-based IDs | Pattern content never shared, only hashes |
+| Embedding Noise | Normalized random noise added |
+| Quantized Metrics | Reduced precision on success rates |
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/federated/receive` | POST | Receive patterns from peer |
+| `/api/federated/stats` | GET | Get federated learning stats |
+
+### Pattern Types
+
+| Type | Source | Purpose |
+|------|--------|---------|
+| `resolution` | Uncertainty logs | Share what resolves ambiguity |
+| `intent` | Intent parsing | Share parsing improvements |
+| `calibration` | Flow state | Share behavioral adjustments |
+
+### Configuration
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `privacy_epsilon` | 1.0 | Differential privacy budget |
+| `k_anonymity` | 5 | Minimum samples before sharing |
+| `sync_interval_minutes` | 30 | Time between sync rounds |
+| `enable_federated_learning` | true | Enable/disable federated layer |
 
 ---
 
@@ -558,6 +652,10 @@ The `code_execute` tool provides:
 | `/purpose` | Display self-narrative |
 | `/project [desc]` | Start GDIL project workflow |
 | `/project status` | View project progress |
+| `/projects` | List all active/paused projects |
+| `/project switch <id>` | Switch to a different project |
+| `/project pause` | Pause current project |
+| `/project archive <id>` | Archive a project |
 | `/resume project` | Continue paused project |
 | `/tools` | List all available tools |
 | `/tool <name>(args)` | Execute a tool |
@@ -701,14 +799,14 @@ synth-mind/
 - [x] Memory embeddings (sentence-transformers + OpenAI fallback)
 - [x] Semantic search and grounding confidence
 - [x] Context coherence drift detection
+- [x] Federated learning for social layer (differential privacy, k-anonymity)
+- [x] Multiple concurrent projects (up to 5, with switching/pause/archive)
 
 ### ⚠️ Partially Complete
 - [~] Dashboard visualization (simplified inline version)
 
 ### ❌ Not Started
-- [ ] Voice interface (Whisper + TTS)
-- [ ] Federated learning for social layer
-- [ ] Multiple concurrent projects
+- [ ] Voice interface (Whisper + TTS) — planned for Agent OS
 - [ ] Project templates library
 - [ ] Visual timeline/Gantt charts
 - [ ] Version control integration
