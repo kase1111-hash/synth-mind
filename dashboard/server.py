@@ -1,13 +1,14 @@
 """
 Dashboard Server - WebSocket server for real-time state streaming.
 Serves the HTML dashboard and broadcasts internal state updates.
+Includes JWT authentication for production security.
 """
 
 import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Set
+from typing import Set, Optional
 from datetime import datetime
 
 # Add parent directory to path for imports
@@ -24,22 +25,44 @@ except ImportError:
     import aiohttp_cors
 
 from core.orchestrator import SynthOrchestrator
+from utils.auth import AuthManager, UserRole
 
 class DashboardServer:
     """WebSocket server for streaming internal state to dashboard."""
-    
-    def __init__(self, orchestrator: SynthOrchestrator, port: int = 8080):
+
+    # Public paths that don't require authentication
+    PUBLIC_PATHS = [
+        '/',
+        '/ws',
+        '/api/auth/login',
+        '/api/auth/setup',
+        '/api/auth/status',
+        '/api/auth/refresh'
+    ]
+
+    def __init__(self, orchestrator: SynthOrchestrator, port: int = 8080,
+                 auth_enabled: bool = True):
         self.orchestrator = orchestrator
         self.port = port
-        self.app = web.Application()
+        self.auth_enabled = auth_enabled
         self.websockets: Set[web.WebSocketResponse] = set()
         self.state_cache = {}
-        
+
+        # Initialize authentication
+        self.auth = AuthManager() if auth_enabled else None
+
+        # Create app with middleware
+        if auth_enabled:
+            self.app = web.Application(middlewares=[self._auth_middleware])
+        else:
+            self.app = web.Application()
+
         # Setup routes
         self._setup_routes()
         
     def _setup_routes(self):
         """Setup HTTP and WebSocket routes."""
+        # Core dashboard routes
         self.app.router.add_get('/', self.serve_dashboard)
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_get('/api/state', self.get_state)
@@ -48,10 +71,25 @@ class DashboardServer:
         self.app.router.add_post('/api/generate', self.peer_generate)
         self.app.router.add_post('/api/federated/receive', self.federated_receive)
         self.app.router.add_get('/api/federated/stats', self.federated_stats)
+
         # Collaborative Projects API
         self.app.router.add_get('/api/collab/projects', self.collab_projects)
         self.app.router.add_post('/api/collab/sync', self.collab_sync)
         self.app.router.add_get('/api/collab/stats', self.collab_stats)
+
+        # Authentication API (always available, even if auth disabled)
+        self.app.router.add_get('/api/auth/status', self.auth_status)
+        self.app.router.add_post('/api/auth/login', self.auth_login)
+        self.app.router.add_post('/api/auth/logout', self.auth_logout)
+        self.app.router.add_post('/api/auth/refresh', self.auth_refresh)
+        self.app.router.add_post('/api/auth/setup', self.auth_setup)
+
+        # User management API (admin only)
+        self.app.router.add_get('/api/users', self.list_users)
+        self.app.router.add_post('/api/users', self.create_user)
+        self.app.router.add_delete('/api/users/{username}', self.delete_user)
+        self.app.router.add_put('/api/users/{username}/password', self.update_password)
+        self.app.router.add_put('/api/users/{username}/role', self.update_role)
 
         # Enable CORS
         cors = aiohttp_cors.setup(self.app, defaults={
@@ -273,6 +311,412 @@ class DashboardServer:
         except Exception as e:
             return web.json_response(
                 {"error": str(e), "success": False},
+                status=500
+            )
+
+    # =========================================================================
+    # Authentication Middleware & Endpoints
+    # =========================================================================
+
+    @web.middleware
+    async def _auth_middleware(self, request, handler):
+        """JWT authentication middleware."""
+        # Skip auth for public paths
+        if any(request.path.startswith(p) for p in self.PUBLIC_PATHS):
+            return await handler(request)
+
+        # Skip if auth is disabled
+        if not self.auth_enabled or not self.auth:
+            return await handler(request)
+
+        # Extract token from Authorization header
+        auth_header = request.headers.get('Authorization', '')
+
+        if not auth_header.startswith('Bearer '):
+            return web.json_response(
+                {"error": "Missing or invalid authorization header"},
+                status=401
+            )
+
+        token = auth_header[7:]  # Remove 'Bearer ' prefix
+        valid, payload = self.auth.validate_token(token)
+
+        if not valid:
+            return web.json_response(
+                {"error": "Invalid or expired token"},
+                status=401
+            )
+
+        # Add user info to request
+        request['user'] = payload
+        return await handler(request)
+
+    def _get_token_from_request(self, request) -> Optional[str]:
+        """Extract token from Authorization header."""
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            return auth_header[7:]
+        return None
+
+    def _require_role(self, request, required_role: UserRole) -> tuple:
+        """
+        Check if request has required role.
+        Returns (authorized, error_response or None)
+        """
+        if not self.auth_enabled or not self.auth:
+            return True, None
+
+        token = self._get_token_from_request(request)
+        if not token:
+            return False, web.json_response(
+                {"error": "Authentication required"},
+                status=401
+            )
+
+        authorized, _ = self.auth.check_permission(token, required_role)
+        if not authorized:
+            return False, web.json_response(
+                {"error": "Insufficient permissions"},
+                status=403
+            )
+
+        return True, None
+
+    async def auth_status(self, request):
+        """Get authentication status and requirements."""
+        if not self.auth_enabled:
+            return web.json_response({
+                "enabled": False,
+                "setup_required": False,
+                "message": "Authentication disabled"
+            })
+
+        return web.json_response({
+            "enabled": True,
+            "setup_required": self.auth.get_setup_required(),
+            "message": "Setup required" if self.auth.get_setup_required() else "Ready"
+        })
+
+    async def auth_setup(self, request):
+        """Initial admin setup (only works if no admin exists)."""
+        if not self.auth_enabled or not self.auth:
+            return web.json_response(
+                {"error": "Authentication not enabled"},
+                status=400
+            )
+
+        if not self.auth.get_setup_required():
+            return web.json_response(
+                {"error": "Setup already completed"},
+                status=400
+            )
+
+        try:
+            data = await request.json()
+            username = data.get('username')
+            password = data.get('password')
+
+            if not username or not password:
+                return web.json_response(
+                    {"error": "Username and password required"},
+                    status=400
+                )
+
+            success, message = self.auth.setup_initial_admin(username, password)
+
+            if success:
+                # Auto-login after setup
+                _, tokens = self.auth.authenticate(username, password)
+                return web.json_response({
+                    "success": True,
+                    "message": message,
+                    **tokens
+                })
+            else:
+                return web.json_response(
+                    {"error": message},
+                    status=400
+                )
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e)},
+                status=500
+            )
+
+    async def auth_login(self, request):
+        """Authenticate and get tokens."""
+        if not self.auth_enabled or not self.auth:
+            return web.json_response({
+                "success": True,
+                "message": "Authentication disabled - access granted"
+            })
+
+        try:
+            data = await request.json()
+            username = data.get('username')
+            password = data.get('password')
+
+            if not username or not password:
+                return web.json_response(
+                    {"error": "Username and password required"},
+                    status=400
+                )
+
+            success, tokens = self.auth.authenticate(username, password)
+
+            if success:
+                return web.json_response({
+                    "success": True,
+                    **tokens
+                })
+            else:
+                return web.json_response(
+                    {"error": "Invalid credentials"},
+                    status=401
+                )
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e)},
+                status=500
+            )
+
+    async def auth_logout(self, request):
+        """Logout and blacklist token."""
+        if not self.auth_enabled or not self.auth:
+            return web.json_response({"success": True})
+
+        token = self._get_token_from_request(request)
+        if token:
+            self.auth.logout(token)
+
+        return web.json_response({
+            "success": True,
+            "message": "Logged out successfully"
+        })
+
+    async def auth_refresh(self, request):
+        """Refresh access token."""
+        if not self.auth_enabled or not self.auth:
+            return web.json_response({
+                "success": True,
+                "message": "Authentication disabled"
+            })
+
+        try:
+            data = await request.json()
+            refresh_token = data.get('refresh_token')
+
+            if not refresh_token:
+                return web.json_response(
+                    {"error": "Refresh token required"},
+                    status=400
+                )
+
+            success, new_tokens = self.auth.refresh_access_token(refresh_token)
+
+            if success:
+                return web.json_response({
+                    "success": True,
+                    **new_tokens
+                })
+            else:
+                return web.json_response(
+                    {"error": "Invalid or expired refresh token"},
+                    status=401
+                )
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e)},
+                status=500
+            )
+
+    # =========================================================================
+    # User Management Endpoints (Admin only)
+    # =========================================================================
+
+    async def list_users(self, request):
+        """List all users (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.auth:
+            return web.json_response({"users": []})
+
+        return web.json_response({
+            "success": True,
+            "users": self.auth.list_users()
+        })
+
+    async def create_user(self, request):
+        """Create new user (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.auth:
+            return web.json_response(
+                {"error": "Authentication not available"},
+                status=503
+            )
+
+        try:
+            data = await request.json()
+            username = data.get('username')
+            password = data.get('password')
+            role = data.get('role', 'viewer')
+
+            if not username or not password:
+                return web.json_response(
+                    {"error": "Username and password required"},
+                    status=400
+                )
+
+            try:
+                user_role = UserRole(role)
+            except ValueError:
+                return web.json_response(
+                    {"error": f"Invalid role. Must be: admin, operator, or viewer"},
+                    status=400
+                )
+
+            success, message = self.auth.create_user(username, password, user_role)
+
+            if success:
+                return web.json_response({
+                    "success": True,
+                    "message": message
+                })
+            else:
+                return web.json_response(
+                    {"error": message},
+                    status=400
+                )
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e)},
+                status=500
+            )
+
+    async def delete_user(self, request):
+        """Delete user (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.auth:
+            return web.json_response(
+                {"error": "Authentication not available"},
+                status=503
+            )
+
+        username = request.match_info['username']
+        success, message = self.auth.delete_user(username)
+
+        if success:
+            return web.json_response({
+                "success": True,
+                "message": message
+            })
+        else:
+            return web.json_response(
+                {"error": message},
+                status=404
+            )
+
+    async def update_password(self, request):
+        """Update user password (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.auth:
+            return web.json_response(
+                {"error": "Authentication not available"},
+                status=503
+            )
+
+        try:
+            username = request.match_info['username']
+            data = await request.json()
+            new_password = data.get('password')
+
+            if not new_password:
+                return web.json_response(
+                    {"error": "New password required"},
+                    status=400
+                )
+
+            success, message = self.auth.update_password(username, new_password)
+
+            if success:
+                return web.json_response({
+                    "success": True,
+                    "message": message
+                })
+            else:
+                return web.json_response(
+                    {"error": message},
+                    status=400
+                )
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e)},
+                status=500
+            )
+
+    async def update_role(self, request):
+        """Update user role (admin only)."""
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.auth:
+            return web.json_response(
+                {"error": "Authentication not available"},
+                status=503
+            )
+
+        try:
+            username = request.match_info['username']
+            data = await request.json()
+            role = data.get('role')
+
+            if not role:
+                return web.json_response(
+                    {"error": "Role required"},
+                    status=400
+                )
+
+            try:
+                user_role = UserRole(role)
+            except ValueError:
+                return web.json_response(
+                    {"error": f"Invalid role. Must be: admin, operator, or viewer"},
+                    status=400
+                )
+
+            success, message = self.auth.update_role(username, user_role)
+
+            if success:
+                return web.json_response({
+                    "success": True,
+                    "message": message
+                })
+            else:
+                return web.json_response(
+                    {"error": message},
+                    status=400
+                )
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e)},
                 status=500
             )
 
@@ -521,17 +965,30 @@ class DashboardServer:
         """Start the server."""
         # Start background broadcaster
         asyncio.create_task(self.start_background_broadcast())
-        
+
         # Start web server
         runner = web.AppRunner(self.app)
         await runner.setup()
         site = web.TCPSite(runner, 'localhost', self.port)
         await site.start()
-        
+
         print(f"\n{'='*60}")
-        print(f"🔮 Dashboard server running at http://localhost:{self.port}")
+        print(f"  Dashboard server running at http://localhost:{self.port}")
+        print(f"{'='*60}")
+
+        # Show authentication status
+        if self.auth_enabled and self.auth:
+            if self.auth.get_setup_required():
+                print(f"  Authentication: ENABLED (setup required)")
+                print(f"  POST /api/auth/setup to create admin user")
+            else:
+                print(f"  Authentication: ENABLED")
+                print(f"  POST /api/auth/login to authenticate")
+        else:
+            print(f"  Authentication: DISABLED")
+
         print(f"{'='*60}\n")
-        
+
         # Keep server running
         try:
             await asyncio.Event().wait()
@@ -541,15 +998,26 @@ class DashboardServer:
 
 async def main():
     """Main entry point for dashboard server."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Synth Mind Dashboard Server')
+    parser.add_argument('--port', type=int, default=8080, help='Server port (default: 8080)')
+    parser.add_argument('--no-auth', action='store_true', help='Disable authentication')
+    args = parser.parse_args()
+
     print("Initializing Synth Mind with dashboard...")
-    
+
     # Initialize orchestrator
     orchestrator = SynthOrchestrator()
     await orchestrator.initialize()
-    
+
     # Create and start dashboard server
-    server = DashboardServer(orchestrator, port=8080)
-    
+    server = DashboardServer(
+        orchestrator,
+        port=args.port,
+        auth_enabled=not args.no_auth
+    )
+
     # Start both server and orchestrator
     await asyncio.gather(
         server.start(),
