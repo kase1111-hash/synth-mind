@@ -46,6 +46,8 @@ class DashboardServer:
         self.app.router.add_post('/api/simulate', self.simulate_turn)
         self.app.router.add_post('/api/reflect', self.trigger_reflection)
         self.app.router.add_post('/api/generate', self.peer_generate)
+        self.app.router.add_post('/api/federated/receive', self.federated_receive)
+        self.app.router.add_get('/api/federated/stats', self.federated_stats)
         
         # Enable CORS
         cors = aiohttp_cors.setup(self.app, defaults={
@@ -168,7 +170,55 @@ class DashboardServer:
                 {"error": str(e), "success": False},
                 status=500
             )
-    
+
+    async def federated_receive(self, request):
+        """
+        Receive federated learning update from a peer.
+        Endpoint for privacy-preserving pattern sharing.
+        """
+        try:
+            data = await request.json()
+
+            # Check if social layer has federated learning enabled
+            if hasattr(self.orchestrator, 'social') and self.orchestrator.social:
+                result = await self.orchestrator.social.receive_federated_update(data)
+                return web.json_response(result)
+            else:
+                return web.json_response({
+                    "success": False,
+                    "error": "Federated learning not available"
+                }, status=503)
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def federated_stats(self, request):
+        """Get federated learning statistics."""
+        try:
+            if hasattr(self.orchestrator, 'social') and self.orchestrator.social:
+                stats = self.orchestrator.social.get_federated_stats()
+                if stats:
+                    return web.json_response({"success": True, "stats": stats})
+                else:
+                    return web.json_response({
+                        "success": False,
+                        "error": "Federated learning not enabled"
+                    })
+            else:
+                return web.json_response({
+                    "success": False,
+                    "error": "Social layer not available"
+                }, status=503)
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
     def gather_state(self) -> dict:
         """Gather complete internal state."""
         emotion_state = self.orchestrator.emotion.current_state()
