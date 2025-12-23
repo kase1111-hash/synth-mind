@@ -2,12 +2,15 @@
 Goal-Directed Iteration Loop (GDIL)
 Systematic project handling with clarification, iteration, and graceful exits.
 Supports multiple concurrent projects with project switching.
+Includes project templates for quick-start common project types.
 """
 
 import json
 import time
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
+
+from psychological.project_templates import ProjectTemplateLibrary
 
 class ProjectPhase(Enum):
     """Project lifecycle phases."""
@@ -60,6 +63,9 @@ class GoalDirectedIterationLoop:
         self.projects: Dict[str, Dict] = {}  # All active projects
         self.current_project_id: Optional[str] = None  # Currently focused project
         self.project_history: List[Dict] = []  # Archived/completed projects
+
+        # Template library
+        self.templates = ProjectTemplateLibrary(memory)
 
         # Load persisted projects on init
         self._load_persisted_projects()
@@ -781,3 +787,126 @@ Output JSON:
             })
 
         return sorted(statuses, key=lambda p: p["updated_at"], reverse=True)
+
+    # ============================================
+    # Project Templates
+    # ============================================
+
+    def list_templates(self, category: Optional[str] = None) -> str:
+        """List available project templates."""
+        return self.templates.list_templates(category)
+
+    def get_template_details(self, template_id: str) -> str:
+        """Get detailed information about a template."""
+        return self.templates.get_template_details(template_id)
+
+    def start_project_from_template(
+        self,
+        template_id: str,
+        customization: str = ""
+    ) -> str:
+        """
+        Start a new project from a template.
+        Skips some clarification since template provides structure.
+        """
+        # Check concurrent project limit
+        active_count = len([
+            p for p in self.projects.values()
+            if p.get("phase") not in [ProjectPhase.EXIT, ProjectPhase.ARCHIVED, "exit", "archived"]
+        ])
+        if active_count >= self.max_concurrent_projects:
+            return (
+                f"You have {active_count} active projects (max: {self.max_concurrent_projects}).\n"
+                f"Use `/projects` to see them, `/project switch <id>` to switch, "
+                f"or `/project archive <id>` to archive one."
+            )
+
+        # Get template configuration
+        template_config = self.templates.create_project_from_template(template_id, customization)
+        if not template_config:
+            return f"Template `{template_id}` not found. Use `/templates` to see available templates."
+
+        project_id = f"project_{int(time.time())}"
+        project_name = template_config["template_name"]
+        if customization:
+            project_name = f"{project_name}: {customization[:30]}"
+
+        # Create new project with template data
+        new_project = {
+            "id": project_id,
+            "name": project_name,
+            "initial_input": template_config["initial_input"],
+            "phase": ProjectPhase.INITIALIZATION,
+            "brief": template_config["suggested_brief"],
+            "end_transformation": template_config["end_transformation"],
+            "roadmap": template_config["roadmap"],
+            "current_subtask": None,
+            "iterations": [],
+            "progress_score": 0.0,
+            "blockers": [],
+            "created_at": time.time(),
+            "updated_at": time.time(),
+            "template_id": template_config["template_id"],
+            "template_questions": template_config["clarifying_questions"]
+        }
+
+        # Add to projects and set as current
+        self.projects[project_id] = new_project
+        self.current_project_id = project_id
+
+        # Apply empathetic acknowledgment
+        self.emotion.apply_reward_signal(valence=0.5, label="template_project_start", intensity=0.6)
+
+        # Store in memory
+        self.memory.store_episodic(
+            event="template_project_started",
+            content={"project_id": project_id, "template": template_id},
+            valence=0.5
+        )
+
+        # Format response with template questions
+        output = f"**Starting from template: {template_config['template_name']}**\n\n"
+        output += f"*{template_config['suggested_brief']}*\n\n"
+        output += f"**End Goal:** {template_config['end_transformation']}\n\n"
+
+        output += "**Pre-defined Roadmap:**\n"
+        for i, task in enumerate(template_config["roadmap"][:5], 1):
+            output += f"  {i}. {task['name']}\n"
+        if len(template_config["roadmap"]) > 5:
+            output += f"  ... and {len(template_config['roadmap']) - 5} more tasks\n"
+
+        output += "\n**Quick Questions to Customize:**\n"
+        for i, q in enumerate(template_config["clarifying_questions"][:3], 1):
+            output += f"  {i}. {q}\n"
+
+        output += "\nAnswer these or say 'skip' to use defaults and start immediately."
+        return output
+
+    def process_template_clarification(self, user_response: str) -> str:
+        """
+        Process clarification for template-based project.
+        If user says 'skip', jump directly to iteration.
+        """
+        if not self.active_project or self.active_project.get("template_id") is None:
+            return self.process_clarification(user_response)
+
+        # Check for skip
+        if user_response.lower().strip() in ["skip", "start", "go", "begin", "defaults"]:
+            # Jump to iteration phase with template defaults
+            self.active_project["phase"] = ProjectPhase.ITERATION
+            self.active_project["iteration_count"] = 0
+            self.active_project["low_progress_count"] = 0
+            self.active_project["updated_at"] = time.time()
+
+            # Update Temporal Purpose
+            self.temporal.incorporate_reflection(
+                f"Starting template project: {self.active_project.get('name', '')}",
+                "I am a project partner"
+            )
+
+            # Select first subtask
+            next_task = self._select_next_subtask()
+            return self._execute_subtask(next_task)
+
+        # Process as normal clarification
+        return self.process_clarification(user_response)

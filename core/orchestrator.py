@@ -282,6 +282,23 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             # List all projects
             response = self.gdil.list_projects()
             print(f"\n{response}\n")
+        elif cmd == "/templates":
+            # List all project templates
+            response = self.gdil.list_templates()
+            print(f"\n{response}\n")
+        elif cmd.startswith("/template "):
+            # Show template details
+            template_id = command[10:].strip()
+            response = self.gdil.get_template_details(template_id)
+            print(f"\n📋 {response}\n")
+        elif cmd.startswith("/project template "):
+            # Start project from template
+            args = command[18:].strip()
+            parts = args.split(maxsplit=1)
+            template_id = parts[0] if parts else ""
+            customization = parts[1] if len(parts) > 1 else ""
+            response = self.gdil.start_project_from_template(template_id, customization)
+            print(f"\n📋 {response}\n")
         elif cmd.startswith("/project switch "):
             # Switch to a different project
             project_id = command[16:].strip()

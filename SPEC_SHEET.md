@@ -23,6 +23,7 @@
 | Memory Embeddings | ✅ Complete | sentence-transformers + OpenAI fallback |
 | Federated Learning | ✅ Complete | Privacy-preserving pattern sharing |
 | Multiple Concurrent Projects | ✅ Complete | GDIL multi-project with switching |
+| Project Templates | ✅ Complete | 10 built-in templates with roadmaps |
 
 ### Detailed Component Status
 
@@ -72,13 +73,14 @@
 | Multi-Project CLI | `core/orchestrator.py` | `/projects`, `/project switch`, `/project pause`, `/project archive` |
 | Full Dashboard HTML | `dashboard/dashboard.html` | 8-card WebSocket dashboard with live updates |
 | Dashboard Project View | `dashboard/server.py` | Project status API for dashboard |
+| Project Templates | `psychological/project_templates.py` | 10 built-in templates with pre-defined roadmaps |
+| Template CLI Commands | `core/orchestrator.py` | `/templates`, `/template`, `/project template` |
 
 #### ❌ Not Implemented (Design/Roadmap Only)
 
 | Feature | Documentation | Notes |
 |---------|---------------|-------|
 | Voice Interface | README roadmap | Whisper + TTS not integrated |
-| Project Templates | GDIL_COMPLETE.md | Not implemented |
 | Visual Timeline/Gantt | GDIL_COMPLETE.md | Not implemented |
 | Version Control Integration | GDIL_COMPLETE.md | No Git integration |
 
@@ -330,6 +332,61 @@ Manage up to 5 concurrent projects with seamless context switching.
 - **Persistence**: Projects survive restarts via memory system
 - **Auto-Pause**: Switching projects pauses the current one
 - **Context Preservation**: Each project maintains full state including iterations
+
+### Project Templates
+
+**Status:** ✅ Implemented
+**File:** `psychological/project_templates.py`
+
+Quick-start projects with pre-defined roadmaps and clarification questions.
+
+#### Built-in Templates
+
+| ID | Name | Category | Tasks |
+|----|------|----------|-------|
+| `web-app` | Web Application | Web Development | 7 |
+| `api` | REST API | Web Development | 6 |
+| `data-analysis` | Data Analysis | Data Science | 6 |
+| `ml-model` | Machine Learning Model | Data Science | 7 |
+| `refactor` | Code Refactoring | Code Quality | 7 |
+| `bug-fix` | Bug Investigation & Fix | Code Quality | 6 |
+| `new-feature` | New Feature | Features | 6 |
+| `documentation` | Documentation | Documentation | 6 |
+| `test-suite` | Test Suite | Testing | 6 |
+| `cli-tool` | CLI Tool | Tools | 6 |
+
+#### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/templates` | List all available templates |
+| `/template <id>` | View template details |
+| `/project template <id>` | Start project from template |
+| `/project template <id> <customization>` | Start with customization |
+
+#### Template Contents
+
+Each template includes:
+- **Pre-defined roadmap** with prioritized tasks and dependencies
+- **Clarifying questions** for customization
+- **Suggested brief** and end transformation
+- **Estimated iterations** for completion
+
+#### Usage Example
+
+```bash
+# List templates
+/templates
+
+# View template details
+/template web-app
+
+# Start from template
+/project template api
+
+# Start with customization
+/project template api User authentication service
+```
 
 ---
 
@@ -657,6 +714,9 @@ The `code_execute` tool provides:
 | `/project switch <id>` | Switch to a different project |
 | `/project pause` | Pause current project |
 | `/project archive <id>` | Archive a project |
+| `/project template <id>` | Start project from template |
+| `/templates` | List all available templates |
+| `/template <id>` | View template details |
 | `/resume project` | Continue paused project |
 | `/tools` | List all available tools |
 | `/tool <name>(args)` | Execute a tool |
@@ -803,10 +863,10 @@ synth-mind/
 - [x] Federated learning for social layer (differential privacy, k-anonymity)
 - [x] Multiple concurrent projects (up to 5, with switching/pause/archive)
 - [x] Full 8-card dashboard visualization (WebSocket live updates)
+- [x] Project templates library (10 built-in templates)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS
-- [ ] Project templates library
 - [ ] Visual timeline/Gantt charts
 - [ ] Version control integration
 - [ ] Collaborative multi-agent projects
