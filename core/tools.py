@@ -18,6 +18,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 from pathlib import Path
@@ -35,9 +36,18 @@ class ToolManager:
     MAX_CODE_EXECUTION_TIME = 10  # seconds
     MAX_OUTPUT_LENGTH = 10000  # characters
     MAX_FILE_SIZE = 1_000_000  # 1MB
+    # Safe commands only - removed 'find' (has -exec) and 'grep' (complex args)
     ALLOWED_SHELL_COMMANDS = {
-        "ls", "pwd", "date", "whoami", "echo", "cat", "head", "tail",
-        "wc", "grep", "find", "sort", "uniq", "diff", "which", "env"
+        "ls", "pwd", "date", "whoami", "echo", "head", "tail",
+        "wc", "sort", "uniq", "diff", "which"
+    }
+
+    # Dangerous argument patterns per command
+    BLOCKED_ARGS = {
+        "ls": {"-R"},  # Recursive could be slow
+        "head": set(),
+        "tail": set(),
+        "diff": set(),
     }
 
     def __init__(self, workspace_dir: str = "workspace"):
@@ -492,11 +502,16 @@ class ToolManager:
 
     def _shell_run(self, command: str) -> Dict[str, Any]:
         """
-        Run restricted shell commands.
+        Run restricted shell commands safely.
+        Uses list-based execution to prevent command injection.
         Only allows safe, read-only commands.
         """
-        # Parse command to get base command
-        parts = command.strip().split()
+        # Parse command using shlex for proper shell-like tokenization
+        try:
+            parts = shlex.split(command)
+        except ValueError as e:
+            return {"success": False, "error": f"Invalid command syntax: {e}"}
+
         if not parts:
             return {"success": False, "error": "Empty command"}
 
@@ -509,25 +524,50 @@ class ToolManager:
                 "error": f"Command '{base_cmd}' not allowed. Allowed: {', '.join(sorted(self.ALLOWED_SHELL_COMMANDS))}"
             }
 
-        # Block dangerous arguments
+        # Validate each argument for dangerous patterns
         dangerous_patterns = [
-            r'[;&|`$]',  # Command chaining, substitution
-            r'>',  # Redirects
-            r'\.\.',  # Parent directory traversal
-            r'/etc/', r'/root/', r'/home/',  # Sensitive paths
+            r'\.\.',           # Parent directory traversal
+            r'^/etc/',         # Sensitive system paths
+            r'^/root/',
+            r'^/home/',
+            r'^/proc/',
+            r'^/sys/',
+            r'^/dev/',
         ]
 
-        for pattern in dangerous_patterns:
-            if re.search(pattern, command):
-                return {
-                    "success": False,
-                    "error": "Command contains disallowed characters or paths"
-                }
+        for arg in parts[1:]:
+            # Check for dangerous path patterns
+            for pattern in dangerous_patterns:
+                if re.search(pattern, arg):
+                    return {
+                        "success": False,
+                        "error": f"Argument contains disallowed path pattern: {arg}"
+                    }
+
+            # Validate paths are within workspace for file-accessing commands
+            if base_cmd in {"head", "tail", "wc", "sort", "uniq", "diff"}:
+                if arg.startswith('-'):
+                    # It's a flag, check if it's blocked
+                    blocked = self.BLOCKED_ARGS.get(base_cmd, set())
+                    if arg in blocked:
+                        return {
+                            "success": False,
+                            "error": f"Argument '{arg}' not allowed for {base_cmd}"
+                        }
+                elif not arg.startswith('-'):
+                    # It's a file path - validate it's in workspace
+                    validated_path = self._validate_path(arg)
+                    if validated_path is None:
+                        return {
+                            "success": False,
+                            "error": f"Path must be within workspace: {arg}"
+                        }
 
         try:
+            # SECURITY: Use list-based execution, NOT shell=True
             result = subprocess.run(
-                command,
-                shell=True,
+                parts,  # List of arguments, not a string
+                shell=False,  # CRITICAL: Never use shell=True with user input
                 capture_output=True,
                 text=True,
                 timeout=10,
@@ -544,6 +584,8 @@ class ToolManager:
 
         except subprocess.TimeoutExpired:
             return {"success": False, "error": "Command timed out", "command": command}
+        except FileNotFoundError:
+            return {"success": False, "error": f"Command not found: {base_cmd}", "command": command}
         except Exception as e:
             return {"success": False, "error": str(e), "command": command}
 

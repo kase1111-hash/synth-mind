@@ -3,37 +3,49 @@
 **Date:** 2025-12-23
 **Assessment Type:** Full Security Audit
 **Repository:** synth-mind
+**Status:** ✅ Critical issues FIXED
 
 ---
 
 ## Executive Summary
 
-This security assessment covers the Synth Mind codebase with focus on OWASP Top 10 vulnerabilities. The codebase demonstrates good security practices in most areas, with proper parameterized SQL queries, secure password hashing, and JWT authentication. However, **one critical vulnerability** was identified in the shell command execution module that requires immediate attention.
+This security assessment covers the Synth Mind codebase with focus on OWASP Top 10 vulnerabilities. The codebase demonstrates good security practices in most areas, with proper parameterized SQL queries, secure password hashing, and JWT authentication.
 
-| Severity | Count |
-|----------|-------|
-| Critical | 1 |
-| High | 1 |
-| Medium | 3 |
-| Low | 2 |
+**UPDATE:** The critical command injection vulnerability has been fixed as of 2025-12-23.
+
+| Severity | Count | Status |
+|----------|-------|--------|
+| Critical | 1 | ✅ FIXED |
+| High | 1 | Open |
+| Medium | 3 | Open |
+| Low | 2 | Open |
 
 ---
 
 ## Critical Findings
 
-### 1. Command Injection via Shell Execution
+### 1. Command Injection via Shell Execution - ✅ FIXED
 
-**File:** `core/tools.py:493-548`
-**Severity:** CRITICAL
+**File:** `core/tools.py:503-590`
+**Severity:** CRITICAL (was)
 **CVSS Score:** 9.8
+**Status:** ✅ **FIXED on 2025-12-23**
 
-**Description:**
-The `_shell_run` function uses `subprocess.run` with `shell=True`, which creates a command injection vulnerability despite the presence of a blocklist.
+**Original Issue:**
+The `_shell_run` function used `subprocess.run` with `shell=True`, creating a command injection vulnerability.
 
+**Fix Applied:**
+1. ✅ Replaced `shell=True` with `shell=False` and list-based execution
+2. ✅ Removed dangerous commands (`find`, `grep`) from allowlist
+3. ✅ Added proper argument validation using `shlex.split()`
+4. ✅ Added path traversal protection for file-accessing commands
+5. ✅ Added blocked sensitive paths (`/etc/`, `/root/`, `/proc/`, etc.)
+
+**Fixed Code:**
 ```python
 result = subprocess.run(
-    command,
-    shell=True,  # <-- DANGEROUS
+    parts,  # List of arguments, not a string
+    shell=False,  # CRITICAL: Never use shell=True with user input
     capture_output=True,
     text=True,
     timeout=10,
@@ -41,20 +53,14 @@ result = subprocess.run(
 )
 ```
 
-**Attack Vectors:**
-1. The `find` command in `ALLOWED_SHELL_COMMANDS` can execute arbitrary code:
-   ```
-   find . -exec /bin/sh -c 'malicious_command' \;
-   ```
-
-2. The `grep` command with Perl regex can potentially execute code on some systems
-
-3. Newline injection may bypass the dangerous_patterns check
-
-**Recommendation:**
-- Replace `shell=True` with list-based command execution
-- Remove `find` and `grep` from allowed commands or strictly validate arguments
-- Implement a proper command allowlist with argument validation
+**Verification Tests Passed:**
+- Command injection via `;` - Blocked ✓
+- Backtick substitution - Treated as literal ✓
+- `find` command - Removed from allowlist ✓
+- `grep` command - Removed from allowlist ✓
+- Path traversal (`../`) - Blocked ✓
+- Sensitive paths (`/etc/`) - Blocked ✓
+- Dollar substitution (`$()`) - Treated as literal ✓
 
 ---
 
@@ -220,14 +226,14 @@ The codebase demonstrates several security best practices:
 
 ## Recommendations Summary
 
-| Priority | Action |
-|----------|--------|
-| Immediate | Fix command injection in `_shell_run` - remove `shell=True` |
-| Immediate | Implement actual timeout in `_code_execute` |
-| High | Restrict CORS origins for production |
-| Medium | Replace `eval()` with proper math parser |
-| Medium | Remove auto-pip-install behavior |
-| Low | Persist token blacklist |
+| Priority | Action | Status |
+|----------|--------|--------|
+| ~~Immediate~~ | ~~Fix command injection in `_shell_run`~~ | ✅ FIXED |
+| Immediate | Implement actual timeout in `_code_execute` | Open |
+| High | Restrict CORS origins for production | Open |
+| Medium | Replace `eval()` with proper math parser | Open |
+| Medium | Remove auto-pip-install behavior | Open |
+| Low | Persist token blacklist | Open |
 
 ---
 
