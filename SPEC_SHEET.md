@@ -54,13 +54,13 @@
 
 | Component | Issue | Impact |
 |-----------|-------|--------|
-| `config/personality.yaml` | Empty file | Personality profiles not configured |
 | `config/peers.txt` | Empty file | No peers configured by default |
 
 #### ✅ Recently Implemented
 
 | Component | File | Notes |
 |-----------|------|-------|
+| Personality Configuration | `config/personality.yaml` | 4 personality profiles, GDIL/flow/module settings |
 | Uncertainty Logging | `core/memory.py` | `uncertainty_log` table with full CRUD |
 | Query Rating Integration | `psychological/assurance_resolution.py` | Auto-logs low-confidence responses |
 | Pattern Harvest Utility | `utils/harvest_patterns.py` | CLI tool for analysis + LLM-powered patterns |

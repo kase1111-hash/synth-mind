@@ -31,8 +31,8 @@ synth-mind/
 │   ├── __init__.py                    ⚠️  Create empty file
 │   └── simple_chat.py                 ✅ Complete (Demo script)
 │
-├── config/                            ⚠️  To be created by user
-│   ├── personality.yaml               ⚠️  Optional (future)
+├── config/
+│   ├── personality.yaml               ✅ Complete (Profiles, GDIL, flow settings)
 │   └── peers.txt                      ⚠️  Optional (for social layer)
 │
 └── state/                             ⚠️  Auto-generated on first run
