@@ -949,7 +949,8 @@ synth-mind/
 │   ├── version_control.py          # Git VCS integration
 │   ├── ssl_utils.py                # SSL/TLS certificate utilities
 │   ├── rate_limiter.py             # API rate limiting
-│   └── access_logger.py            # HTTP access logging
+│   ├── access_logger.py            # HTTP access logging
+│   └── ip_firewall.py              # IP-based access control
 │
 ├── dashboard/
 │   ├── server.py                   # WebSocket server
@@ -1305,6 +1306,96 @@ python utils/access_logger.py --tail 20
 python utils/access_logger.py --stats --log-file /path/to/access.log
 ```
 
+### IP Firewall
+
+**Status:** ✅ Implemented
+**Files:** `utils/ip_firewall.py`, `dashboard/server.py`
+
+#### Overview
+
+IP-based firewall for controlling access to the dashboard server. Supports whitelist, blacklist, and peers-only modes with automatic blocking for repeated violations.
+
+#### Firewall Modes
+
+| Mode | Description |
+|------|-------------|
+| `whitelist` | Only IPs in whitelist are allowed |
+| `blacklist` | All IPs allowed except those in blacklist |
+| `peers_only` | Only IPs from peers.txt and localhost allowed |
+
+#### CLI Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--firewall` | - | Enable IP firewall |
+| `--firewall-mode` | `blacklist` | Firewall mode (whitelist/blacklist/peers_only) |
+| `--firewall-whitelist` | - | IPs to whitelist (space-separated) |
+| `--firewall-blacklist` | - | IPs to blacklist (space-separated) |
+| `--firewall-peers-file` | `config/peers.txt` | Peers file for peers_only mode |
+
+#### Features
+
+| Feature | Description |
+|---------|-------------|
+| CIDR Support | Use network ranges like `192.168.1.0/24` |
+| Auto-blocking | Block IPs after repeated violations |
+| Localhost Exempt | `127.0.0.1` and `::1` always allowed |
+| Dynamic Rules | Add/remove rules via API at runtime |
+| Violation Tracking | Track denied requests per IP |
+
+#### API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/firewall/stats` | GET | Admin | Get firewall statistics |
+| `/api/firewall/rules` | GET | Admin | Get current whitelist/blacklist rules |
+| `/api/firewall/blocked` | GET | Admin | Get blocked IPs and violation counts |
+| `/api/firewall/whitelist` | POST | Admin | Add IP to whitelist |
+| `/api/firewall/whitelist` | DELETE | Admin | Remove IP from whitelist |
+| `/api/firewall/blacklist` | POST | Admin | Add IP to blacklist |
+| `/api/firewall/blacklist` | DELETE | Admin | Remove IP from blacklist |
+
+#### Usage Examples
+
+```bash
+# Enable firewall in blacklist mode (default)
+python dashboard/server.py --firewall
+
+# Whitelist mode - only allow specific IPs
+python dashboard/server.py --firewall --firewall-mode whitelist \
+  --firewall-whitelist 192.168.1.100 192.168.1.101
+
+# Blacklist mode - block specific IPs
+python dashboard/server.py --firewall --firewall-mode blacklist \
+  --firewall-blacklist 10.0.0.50 10.0.0.51
+
+# Peers only mode - restrict to known peers
+python dashboard/server.py --firewall --firewall-mode peers_only
+
+# Combined with other security features
+python dashboard/server.py --ssl-dev --firewall --firewall-mode blacklist
+```
+
+#### Managing Rules via API
+
+```bash
+# Add IP to whitelist
+curl -X POST http://localhost:8080/api/firewall/whitelist \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"ip": "192.168.1.100"}'
+
+# Add IP to blacklist
+curl -X POST http://localhost:8080/api/firewall/blacklist \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"ip": "10.0.0.50"}'
+
+# View blocked IPs
+curl http://localhost:8080/api/firewall/blocked \
+  -H "Authorization: Bearer <token>"
+```
+
 ### Production Checklist
 
 - [x] JWT authentication
@@ -1313,7 +1404,7 @@ python utils/access_logger.py --stats --log-file /path/to/access.log
 - [x] Input validation
 - [x] CORS restrictions
 - [x] Access logging
-- [ ] Firewall rules for peer IPs
+- [x] IP firewall rules
 
 ---
 
@@ -1343,6 +1434,7 @@ python utils/access_logger.py --stats --log-file /path/to/access.log
 - [x] HTTPS/WSS encryption (TLS 1.2+, self-signed cert generation)
 - [x] Rate limiting on API endpoints (sliding window, tiered limits)
 - [x] Access logging (multiple formats, rotation, analysis tools)
+- [x] IP firewall (whitelist/blacklist/peers-only modes, CIDR support)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS
