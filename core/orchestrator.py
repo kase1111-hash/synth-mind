@@ -17,6 +17,7 @@ from psychological.temporal_purpose import TemporalPurposeEngine
 from psychological.reward_calibration import RewardCalibrationModule
 from psychological.social_companionship import SocialCompanionshipLayer
 from psychological.goal_directed_iteration import GoalDirectedIterationLoop
+from psychological.collaborative_projects import CollaborativeProjectManager
 from utils.emotion_regulator import EmotionRegulator
 from utils.metrics import MetricsTracker
 
@@ -43,7 +44,8 @@ class SynthOrchestrator:
         self.calibration: Optional[RewardCalibrationModule] = None
         self.social: Optional[SocialCompanionshipLayer] = None
         self.gdil: Optional[GoalDirectedIterationLoop] = None
-        
+        self.collab: Optional[CollaborativeProjectManager] = None
+
         # State
         self.context = []
         self.turn_count = 0
@@ -96,7 +98,17 @@ class SynthOrchestrator:
             self.reflection,
             self.calibration
         )
-        
+
+        # Initialize Collaborative Projects Manager
+        agent_id = self.memory.retrieve_persistent("agent_id") or f"agent_{id(self)}"
+        self.memory.store_persistent("agent_id", agent_id)
+        self.collab = CollaborativeProjectManager(
+            agent_id=agent_id,
+            memory=self.memory,
+            llm=self.llm,
+            peer_endpoints=self.social.peers if self.social else []
+        )
+
         # Start background tasks
         asyncio.create_task(self._background_consolidation())
         asyncio.create_task(self._background_social())
@@ -331,6 +343,101 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         elif cmd == "/resume project":
             response = self.gdil.resume_project()
             print(f"\n🎯 {response}\n")
+        # Collaborative Projects Commands
+        elif cmd == "/collab" or cmd == "/collab help":
+            self._print_collab_help()
+        elif cmd == "/collab list":
+            response = self.collab.list_projects()
+            print(f"\n{response}\n")
+        elif cmd.startswith("/collab create "):
+            # /collab create <name>: <description>
+            args = command[15:].strip()
+            if ":" in args:
+                name, desc = args.split(":", 1)
+                name = name.strip()
+                desc = desc.strip()
+            else:
+                name = args
+                desc = f"Collaborative project: {name}"
+            project = self.collab.create_project(name, desc)
+            print(f"\n🤝 **Created collaborative project:** {project.name}\n")
+            print(f"   ID: `{project.id}`")
+            print(f"   Share this ID with other agents to collaborate.\n")
+        elif cmd.startswith("/collab view "):
+            project_id = command[13:].strip()
+            response = self.collab.get_project_details(project_id)
+            print(f"\n{response}\n")
+        elif cmd.startswith("/collab join "):
+            project_id = command[13:].strip()
+            if self.collab.join_project(project_id):
+                print(f"\n🤝 Joined project `{project_id}`\n")
+            else:
+                print(f"\n❌ Could not join project `{project_id}`\n")
+        elif cmd.startswith("/collab leave "):
+            project_id = command[14:].strip()
+            if self.collab.leave_project(project_id):
+                print(f"\n👋 Left project `{project_id}`\n")
+            else:
+                print(f"\n❌ Could not leave project\n")
+        elif cmd.startswith("/collab tasks "):
+            project_id = command[14:].strip()
+            response = self.collab.list_tasks(project_id)
+            print(f"\n{response}\n")
+        elif cmd.startswith("/collab claim "):
+            task_id = command[14:].strip()
+            response = self.collab.claim_task(task_id)
+            print(f"\n{response}\n")
+        elif cmd.startswith("/collab release "):
+            task_id = command[16:].strip()
+            response = self.collab.release_task(task_id)
+            print(f"\n{response}\n")
+        elif cmd.startswith("/collab progress "):
+            # /collab progress <task_id> <status> [result]
+            args = command[17:].strip().split(maxsplit=2)
+            if len(args) >= 2:
+                task_id, status = args[0], args[1]
+                result = args[2] if len(args) > 2 else None
+                response = self.collab.update_task_progress(task_id, status, result)
+                print(f"\n{response}\n")
+            else:
+                print("\n❌ Usage: /collab progress <task_id> <start|complete|block> [result]\n")
+        elif cmd.startswith("/collab review "):
+            # /collab review <task_id> <approve|reject> [notes]
+            args = command[15:].strip().split(maxsplit=2)
+            if len(args) >= 2:
+                task_id, decision = args[0], args[1]
+                notes = args[2] if len(args) > 2 else None
+                approved = decision.lower() in ["approve", "yes", "ok", "accept"]
+                response = self.collab.review_task(task_id, approved, notes)
+                print(f"\n{response}\n")
+            else:
+                print("\n❌ Usage: /collab review <task_id> <approve|reject> [notes]\n")
+        elif cmd.startswith("/collab msg "):
+            # /collab msg <project_id> <message>
+            args = command[12:].strip().split(maxsplit=1)
+            if len(args) >= 2:
+                project_id, message = args
+                response = self.collab.send_message(project_id, message)
+                print(f"\n💬 {response}\n")
+            else:
+                print("\n❌ Usage: /collab msg <project_id> <message>\n")
+        elif cmd.startswith("/collab chat "):
+            project_id = command[13:].strip()
+            response = self.collab.get_messages(project_id)
+            print(f"\n{response}\n")
+        elif cmd == "/collab sync":
+            print("\n🔄 Syncing with peers...")
+            result = asyncio.create_task(self.collab.sync_with_peers())
+            # Note: This is async, result will complete in background
+            print("   Sync initiated. Check /collab list for updates.\n")
+        elif cmd == "/collab stats":
+            stats = self.collab.get_stats()
+            print(f"\n📊 **Collaboration Stats:**")
+            print(f"   Projects: {stats['active_projects']}/{stats['total_projects']}")
+            print(f"   Total Tasks: {stats['total_tasks']}")
+            print(f"   Your Claimed: {stats['my_tasks_claimed']}")
+            print(f"   Your Completed: {stats['my_tasks_completed']}")
+            print(f"   Peers: {stats['peers_configured']}\n")
         elif cmd == "/reset":
             self.context = []
             self.turn_count = 0
@@ -360,6 +467,33 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         print("Usage: /tool <tool_name>(<args>)")
         print("Example: /tool calculator(expression='2 + 2')")
         print("="*60 + "\n")
+
+    def _print_collab_help(self):
+        """Display collaborative projects help."""
+        print("\n" + "="*60)
+        print("COLLABORATIVE MULTI-AGENT PROJECTS")
+        print("="*60)
+        print("\n**Project Management:**")
+        print("  /collab list              - List all collaborative projects")
+        print("  /collab create <name>     - Create new project (you become coordinator)")
+        print("  /collab view <id>         - View project details")
+        print("  /collab join <id>         - Join a project as contributor")
+        print("  /collab leave <id>        - Leave a project")
+        print("\n**Task Management:**")
+        print("  /collab tasks <id>        - List tasks in a project")
+        print("  /collab claim <task_id>   - Claim an available task")
+        print("  /collab release <task_id> - Release a claimed task")
+        print("  /collab progress <task_id> <start|complete|block> [result]")
+        print("                            - Update task progress")
+        print("  /collab review <task_id> <approve|reject> [notes]")
+        print("                            - Review completed task (coordinator only)")
+        print("\n**Communication:**")
+        print("  /collab msg <id> <message> - Send message to project")
+        print("  /collab chat <id>          - View recent messages")
+        print("\n**Sync & Stats:**")
+        print("  /collab sync              - Sync with peer agents")
+        print("  /collab stats             - View collaboration statistics")
+        print("\n" + "="*60 + "\n")
 
     async def _execute_tool(self, tool_call: str):
         """Execute a tool from command line."""
