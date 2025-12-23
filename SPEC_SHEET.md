@@ -948,7 +948,8 @@ synth-mind/
 │   ├── auth.py                     # JWT authentication
 │   ├── version_control.py          # Git VCS integration
 │   ├── ssl_utils.py                # SSL/TLS certificate utilities
-│   └── rate_limiter.py             # API rate limiting
+│   ├── rate_limiter.py             # API rate limiting
+│   └── access_logger.py            # HTTP access logging
 │
 ├── dashboard/
 │   ├── server.py                   # WebSocket server
@@ -1206,6 +1207,104 @@ python dashboard/server.py --rate-limit-auth 10 --rate-limit-api 100
 python dashboard/server.py --ssl-dev --rate-limit-api 30
 ```
 
+### Access Logging
+
+**Status:** ✅ Implemented
+**Files:** `utils/access_logger.py`, `dashboard/server.py`
+
+#### Overview
+
+HTTP access logging provides visibility into all API requests for monitoring, debugging, and security auditing. Supports multiple log formats and destinations.
+
+#### Log Formats
+
+| Format | Description |
+|--------|-------------|
+| `json` | Structured JSON (default, best for parsing) |
+| `common` | Apache Common Log Format |
+| `combined` | Apache Combined Log Format (with referer/user-agent) |
+| `simple` | Human-readable single-line format |
+
+#### CLI Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--no-access-log` | - | Disable access logging |
+| `--access-log-file` | `state/access.log` | Log file path |
+| `--access-log-format` | `json` | Log format |
+| `--access-log-stdout` | - | Also log to stdout |
+
+#### Log Entry Fields (JSON format)
+
+| Field | Description |
+|-------|-------------|
+| `timestamp` | ISO 8601 timestamp |
+| `method` | HTTP method (GET, POST, etc.) |
+| `path` | Request path |
+| `status_code` | HTTP response status |
+| `duration_ms` | Request duration in milliseconds |
+| `client_ip` | Client IP address |
+| `user` | Authenticated username (if any) |
+| `user_agent` | User-Agent header |
+| `referer` | Referer header |
+| `response_size` | Response body size in bytes |
+
+#### Example Log Entries
+
+**JSON format:**
+```json
+{"timestamp": "2024-01-15T10:30:45.123Z", "method": "GET", "path": "/api/state", "status_code": 200, "duration_ms": 12.5, "client_ip": "127.0.0.1", "user": "admin"}
+```
+
+**Simple format:**
+```
+2024-01-15T10:30:45 | GET    | 200 |   12.5ms | 127.0.0.1       | admin           | /api/state
+```
+
+#### Log Rotation
+
+- Default max file size: 10MB
+- Keeps 5 backup files
+- Automatic rotation when size limit is reached
+
+#### API Endpoint
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/accesslog/stats` | GET | Admin | Get logging statistics |
+
+#### Usage Examples
+
+```bash
+# Default access logging (JSON to file)
+python dashboard/server.py
+
+# Disable access logging
+python dashboard/server.py --no-access-log
+
+# Custom log file and format
+python dashboard/server.py --access-log-file /var/log/synth.log --access-log-format combined
+
+# Log to both file and stdout
+python dashboard/server.py --access-log-stdout
+
+# Simple format for development
+python dashboard/server.py --access-log-format simple --access-log-stdout
+```
+
+#### Log Analysis Utilities
+
+```bash
+# View log statistics
+python utils/access_logger.py --stats
+
+# View last 20 log entries
+python utils/access_logger.py --tail 20
+
+# Custom log file
+python utils/access_logger.py --stats --log-file /path/to/access.log
+```
+
 ### Production Checklist
 
 - [x] JWT authentication
@@ -1213,7 +1312,7 @@ python dashboard/server.py --ssl-dev --rate-limit-api 30
 - [x] Rate limiting on API endpoints
 - [x] Input validation
 - [x] CORS restrictions
-- [ ] Access logging
+- [x] Access logging
 - [ ] Firewall rules for peer IPs
 
 ---
@@ -1243,6 +1342,7 @@ python dashboard/server.py --ssl-dev --rate-limit-api 30
 - [x] Version control integration (Git auto-commit, rollback, changelog)
 - [x] HTTPS/WSS encryption (TLS 1.2+, self-signed cert generation)
 - [x] Rate limiting on API endpoints (sliding window, tiered limits)
+- [x] Access logging (multiple formats, rotation, analysis tools)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS

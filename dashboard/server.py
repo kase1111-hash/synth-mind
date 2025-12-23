@@ -28,6 +28,7 @@ except ImportError:
 from core.orchestrator import SynthOrchestrator
 from utils.auth import AuthManager, UserRole
 from utils.rate_limiter import RateLimiter, RateLimitConfig, create_rate_limit_middleware
+from utils.access_logger import AccessLogger, AccessLogConfig, LogFormat, create_access_log_middleware
 
 class DashboardServer:
     """WebSocket server for streaming internal state to dashboard."""
@@ -48,7 +49,9 @@ class DashboardServer:
                  ssl_cert: str = None, ssl_key: str = None,
                  ssl_context: ssl.SSLContext = None,
                  rate_limit_enabled: bool = True,
-                 rate_limit_config: RateLimitConfig = None):
+                 rate_limit_config: RateLimitConfig = None,
+                 access_log_enabled: bool = True,
+                 access_log_config: AccessLogConfig = None):
         """
         Initialize the dashboard server.
 
@@ -62,6 +65,8 @@ class DashboardServer:
             ssl_context: Pre-configured SSLContext (overrides ssl_cert/ssl_key)
             rate_limit_enabled: Enable rate limiting (default: True)
             rate_limit_config: Custom rate limit configuration
+            access_log_enabled: Enable access logging (default: True)
+            access_log_config: Custom access log configuration
         """
         self.orchestrator = orchestrator
         self.port = port
@@ -107,8 +112,18 @@ class DashboardServer:
         else:
             self.rate_limiter = None
 
-        # Build middleware stack
+        # Initialize access logger
+        self.access_log_enabled = access_log_enabled
+        if access_log_enabled:
+            config = access_log_config or AccessLogConfig()
+            self.access_logger = AccessLogger(config)
+        else:
+            self.access_logger = None
+
+        # Build middleware stack (order matters: logging first, then rate limit, then auth)
         middlewares = []
+        if access_log_enabled and self.access_logger:
+            middlewares.append(create_access_log_middleware(self.access_logger))
         if rate_limit_enabled and self.rate_limiter:
             middlewares.append(create_rate_limit_middleware(self.rate_limiter))
         if auth_enabled:
@@ -169,6 +184,9 @@ class DashboardServer:
 
         # Rate limiting API
         self.app.router.add_get('/api/ratelimit/stats', self.ratelimit_stats)
+
+        # Access logging API
+        self.app.router.add_get('/api/accesslog/stats', self.accesslog_stats)
 
         # Enable CORS with restricted origins (security fix)
         # Only allow localhost by default - configure allowed_origins for production
@@ -550,6 +568,32 @@ class DashboardServer:
 
         try:
             stats = self.rate_limiter.get_stats()
+            return web.json_response({
+                "success": True,
+                **stats
+            })
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def accesslog_stats(self, request):
+        """Get access logging statistics (admin only)."""
+        # Check admin permission
+        authorized, error = self._require_role(request, UserRole.ADMIN)
+        if not authorized:
+            return error
+
+        if not self.access_log_enabled or not self.access_logger:
+            return web.json_response({
+                "success": True,
+                "enabled": False,
+                "message": "Access logging is disabled"
+            })
+
+        try:
+            stats = self.access_logger.get_stats()
             return web.json_response({
                 "success": True,
                 **stats
@@ -1265,6 +1309,18 @@ class DashboardServer:
         else:
             print(f"  Rate Limiting: DISABLED")
 
+        # Show access logging status
+        if self.access_log_enabled and self.access_logger:
+            config = self.access_logger.config
+            print(f"  Access Logging: ENABLED")
+            print(f"    - Format: {config.format.value}")
+            if config.log_to_file:
+                print(f"    - Log file: {config.log_file}")
+            if config.log_to_stdout:
+                print(f"    - Stdout: enabled")
+        else:
+            print(f"  Access Logging: DISABLED")
+
         print(f"{'='*60}\n")
 
         # Keep server running
@@ -1300,6 +1356,18 @@ async def main():
     rate_group.add_argument('--rate-limit-window', type=int, default=60,
                            help='Rate limit window in seconds (default: 60)')
 
+    # Access logging options
+    log_group = parser.add_argument_group('Access Logging Options')
+    log_group.add_argument('--no-access-log', action='store_true',
+                          help='Disable access logging')
+    log_group.add_argument('--access-log-file', type=str, default='state/access.log',
+                          help='Access log file path (default: state/access.log)')
+    log_group.add_argument('--access-log-format', type=str, default='json',
+                          choices=['json', 'common', 'combined', 'simple'],
+                          help='Access log format (default: json)')
+    log_group.add_argument('--access-log-stdout', action='store_true',
+                          help='Also log to stdout')
+
     args = parser.parse_args()
 
     # Handle SSL configuration
@@ -1333,6 +1401,23 @@ async def main():
             enabled=True
         )
 
+    # Configure access logging
+    access_log_config = None
+    if not args.no_access_log:
+        format_map = {
+            'json': LogFormat.JSON,
+            'common': LogFormat.COMMON,
+            'combined': LogFormat.COMBINED,
+            'simple': LogFormat.SIMPLE,
+        }
+        access_log_config = AccessLogConfig(
+            enabled=True,
+            format=format_map[args.access_log_format],
+            log_file=args.access_log_file,
+            log_to_file=True,
+            log_to_stdout=args.access_log_stdout,
+        )
+
     print("Initializing Synth Mind with dashboard...")
 
     # Initialize orchestrator
@@ -1347,7 +1432,9 @@ async def main():
         ssl_cert=ssl_cert,
         ssl_key=ssl_key,
         rate_limit_enabled=not args.no_rate_limit,
-        rate_limit_config=rate_limit_config
+        rate_limit_config=rate_limit_config,
+        access_log_enabled=not args.no_access_log,
+        access_log_config=access_log_config
     )
 
     # Start both server and orchestrator
