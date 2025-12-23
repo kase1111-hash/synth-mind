@@ -15,7 +15,7 @@
 | Core Architecture | ✅ Complete | Orchestrator, LLM wrapper, memory system |
 | 6 Psychological Modules | ✅ Complete | All modules fully implemented |
 | GDIL System | ✅ Complete | 526 lines, 4-phase lifecycle |
-| Dashboard | ✅ Complete | WebSocket server with inline fallback |
+| Dashboard | ✅ Complete | Full 8-card WebSocket dashboard |
 | CLI Commands | ✅ Complete | All documented commands work |
 | Peer Networking | ✅ Complete | API endpoint ready |
 | Self-Healing (Query Rating) | ✅ Complete | Logging + harvest utility implemented |
@@ -49,7 +49,6 @@
 
 | Component | Issue | Impact |
 |-----------|-------|--------|
-| Dashboard HTML | Inline fallback only | Full 8-card dashboard in docs, simplified inline |
 | `config/personality.yaml` | Empty file | Personality profiles not configured |
 | `config/peers.txt` | Empty file | No peers configured by default |
 
@@ -71,6 +70,8 @@
 | Federated API | `dashboard/server.py` | `/api/federated/receive`, `/api/federated/stats` |
 | Multi-Project GDIL | `psychological/goal_directed_iteration.py` | Concurrent projects, switching, persistence |
 | Multi-Project CLI | `core/orchestrator.py` | `/projects`, `/project switch`, `/project pause`, `/project archive` |
+| Full Dashboard HTML | `dashboard/dashboard.html` | 8-card WebSocket dashboard with live updates |
+| Dashboard Project View | `dashboard/server.py` | Project status API for dashboard |
 
 #### ❌ Not Implemented (Design/Roadmap Only)
 
@@ -801,9 +802,7 @@ synth-mind/
 - [x] Context coherence drift detection
 - [x] Federated learning for social layer (differential privacy, k-anonymity)
 - [x] Multiple concurrent projects (up to 5, with switching/pause/archive)
-
-### ⚠️ Partially Complete
-- [~] Dashboard visualization (simplified inline version)
+- [x] Full 8-card dashboard visualization (WebSocket live updates)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS
