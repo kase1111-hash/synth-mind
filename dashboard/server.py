@@ -48,7 +48,11 @@ class DashboardServer:
         self.app.router.add_post('/api/generate', self.peer_generate)
         self.app.router.add_post('/api/federated/receive', self.federated_receive)
         self.app.router.add_get('/api/federated/stats', self.federated_stats)
-        
+        # Collaborative Projects API
+        self.app.router.add_get('/api/collab/projects', self.collab_projects)
+        self.app.router.add_post('/api/collab/sync', self.collab_sync)
+        self.app.router.add_get('/api/collab/stats', self.collab_stats)
+
         # Enable CORS
         cors = aiohttp_cors.setup(self.app, defaults={
             "*": aiohttp_cors.ResourceOptions(
@@ -213,6 +217,59 @@ class DashboardServer:
                     "error": "Social layer not available"
                 }, status=503)
 
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def collab_projects(self, request):
+        """Get collaborative projects for sync."""
+        try:
+            if hasattr(self.orchestrator, 'collab') and self.orchestrator.collab:
+                data = self.orchestrator.collab.get_sync_data()
+                return web.json_response({"success": True, **data})
+            else:
+                return web.json_response({
+                    "success": False,
+                    "error": "Collaboration not available"
+                }, status=503)
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def collab_sync(self, request):
+        """Receive collaborative project sync from peer."""
+        try:
+            data = await request.json()
+
+            if hasattr(self.orchestrator, 'collab') and self.orchestrator.collab:
+                result = await self.orchestrator.collab.receive_sync(data)
+                return web.json_response(result)
+            else:
+                return web.json_response({
+                    "success": False,
+                    "error": "Collaboration not available"
+                }, status=503)
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def collab_stats(self, request):
+        """Get collaboration statistics."""
+        try:
+            if hasattr(self.orchestrator, 'collab') and self.orchestrator.collab:
+                stats = self.orchestrator.collab.get_stats()
+                return web.json_response({"success": True, "stats": stats})
+            else:
+                return web.json_response({
+                    "success": False,
+                    "error": "Collaboration not available"
+                }, status=503)
         except Exception as e:
             return web.json_response(
                 {"error": str(e), "success": False},

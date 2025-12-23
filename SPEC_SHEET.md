@@ -24,6 +24,7 @@
 | Federated Learning | ✅ Complete | Privacy-preserving pattern sharing |
 | Multiple Concurrent Projects | ✅ Complete | GDIL multi-project with switching |
 | Project Templates | ✅ Complete | 10 built-in templates with roadmaps |
+| Collaborative Projects | ✅ Complete | Multi-agent project collaboration |
 
 ### Detailed Component Status
 
@@ -75,6 +76,9 @@
 | Dashboard Project View | `dashboard/server.py` | Project status API for dashboard |
 | Project Templates | `psychological/project_templates.py` | 10 built-in templates with pre-defined roadmaps |
 | Template CLI Commands | `core/orchestrator.py` | `/templates`, `/template`, `/project template` |
+| Collaborative Projects | `psychological/collaborative_projects.py` | Multi-agent collaboration (600+ lines) |
+| Collaboration CLI | `core/orchestrator.py` | `/collab` commands for multi-agent projects |
+| Collaboration API | `dashboard/server.py` | `/api/collab/projects`, `/api/collab/sync`, `/api/collab/stats` |
 
 #### ❌ Not Implemented (Design/Roadmap Only)
 
@@ -387,6 +391,69 @@ Each template includes:
 # Start with customization
 /project template api User authentication service
 ```
+
+### Collaborative Multi-Agent Projects
+
+**Status:** ✅ Implemented
+**File:** `psychological/collaborative_projects.py`
+
+Multiple synth-mind instances can collaborate on shared projects.
+
+#### Agent Roles
+
+| Role | Description |
+|------|-------------|
+| `coordinator` | Created the project, manages overall flow |
+| `contributor` | Joined to help with tasks |
+| `reviewer` | Reviews completed work |
+| `observer` | Read-only access |
+
+#### Task States
+
+| State | Description |
+|-------|-------------|
+| `available` | Not claimed by anyone |
+| `claimed` | Reserved by an agent |
+| `in_progress` | Active work happening |
+| `pending_review` | Completed, needs review |
+| `approved` | Reviewed and approved |
+| `blocked` | Has blockers |
+
+#### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/collab` | Show collaboration help |
+| `/collab list` | List collaborative projects |
+| `/collab create <name>` | Create new project (you become coordinator) |
+| `/collab view <id>` | View project details |
+| `/collab join <id>` | Join a project as contributor |
+| `/collab leave <id>` | Leave a project |
+| `/collab tasks <id>` | List tasks in a project |
+| `/collab claim <task_id>` | Claim an available task |
+| `/collab release <task_id>` | Release a claimed task |
+| `/collab progress <task_id> <status>` | Update task progress |
+| `/collab review <task_id> <approve/reject>` | Review task (coordinator only) |
+| `/collab msg <id> <message>` | Send message to project |
+| `/collab chat <id>` | View recent messages |
+| `/collab sync` | Sync with peer agents |
+| `/collab stats` | View collaboration statistics |
+
+#### Features
+
+- **Task Dependencies**: Tasks can depend on other tasks
+- **Version Tracking**: Conflict resolution via version numbers
+- **Inter-Agent Chat**: Built-in messaging system
+- **Peer Sync**: Synchronize project state via API endpoints
+- **Activity Log**: Track all project events
+
+#### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/collab/projects` | GET | Get projects for sync |
+| `/api/collab/sync` | POST | Receive sync from peer |
+| `/api/collab/stats` | GET | Get collaboration statistics |
 
 ---
 
@@ -720,6 +787,14 @@ The `code_execute` tool provides:
 | `/resume project` | Continue paused project |
 | `/tools` | List all available tools |
 | `/tool <name>(args)` | Execute a tool |
+| `/collab` | Show collaboration help |
+| `/collab list` | List collaborative projects |
+| `/collab create <name>` | Create new collaborative project |
+| `/collab view <id>` | View project details |
+| `/collab join <id>` | Join a project |
+| `/collab tasks <id>` | List tasks in a project |
+| `/collab claim <task_id>` | Claim an available task |
+| `/collab sync` | Sync with peer agents |
 | `/reset` | Clear session (keeps identity) |
 | `/quit` | Save and exit |
 
@@ -864,12 +939,12 @@ synth-mind/
 - [x] Multiple concurrent projects (up to 5, with switching/pause/archive)
 - [x] Full 8-card dashboard visualization (WebSocket live updates)
 - [x] Project templates library (10 built-in templates)
+- [x] Collaborative multi-agent projects (task claiming, sync, roles)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS
 - [ ] Visual timeline/Gantt charts
 - [ ] Version control integration
-- [ ] Collaborative multi-agent projects
 - [ ] Cloud-hosted dashboards
 - [ ] JWT authentication for production
 - [ ] HTTPS/WSS encryption
