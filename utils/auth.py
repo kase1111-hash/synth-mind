@@ -87,6 +87,7 @@ class AuthManager:
 
         self.users_file = self.data_dir / "users.json"
         self.config_file = self.data_dir / "auth_config.json"
+        self.blacklist_file = self.data_dir / "token_blacklist.json"
 
         # Load or generate secret key
         self.secret_key = secret_key or self._load_or_create_secret()
@@ -95,8 +96,9 @@ class AuthManager:
         self.users: Dict[str, User] = {}
         self._load_users()
 
-        # Token blacklist (for logout)
+        # Token blacklist (for logout) - now persisted to disk
         self.blacklisted_tokens: set = set()
+        self._load_blacklist()
 
     def _load_or_create_secret(self) -> str:
         """Load existing secret key or create new one."""
@@ -132,6 +134,42 @@ class AuthManager:
         with open(self.users_file, 'w') as f:
             json.dump(data, f, indent=2)
         os.chmod(self.users_file, 0o600)  # Secure permissions
+
+    def _load_blacklist(self):
+        """Load token blacklist from storage and clean expired tokens."""
+        if self.blacklist_file.exists():
+            try:
+                with open(self.blacklist_file, 'r') as f:
+                    data = json.load(f)
+                    # Load tokens with their expiration times
+                    now = datetime.now().timestamp()
+                    # Only keep tokens that haven't expired yet
+                    self.blacklisted_tokens = {
+                        token for token, exp_time in data.items()
+                        if exp_time > now
+                    }
+                    # Clean up expired tokens from file
+                    self._save_blacklist()
+            except (json.JSONDecodeError, KeyError):
+                self.blacklisted_tokens = set()
+
+    def _save_blacklist(self):
+        """Save token blacklist to storage with expiration times."""
+        # Store tokens with their expiration time for cleanup
+        data = {}
+        for token in self.blacklisted_tokens:
+            try:
+                # Decode without verification to get expiration
+                payload = jwt.decode(token, options={"verify_signature": False})
+                exp_time = payload.get("exp", 0)
+                data[token] = exp_time
+            except jwt.InvalidTokenError:
+                # If we can't decode, keep it for 24 hours
+                data[token] = (datetime.now() + timedelta(hours=24)).timestamp()
+
+        with open(self.blacklist_file, 'w') as f:
+            json.dump(data, f, indent=2)
+        os.chmod(self.blacklist_file, 0o600)  # Secure permissions
 
     def _hash_password(self, password: str, salt: Optional[str] = None) -> Tuple[str, str]:
         """
@@ -352,8 +390,9 @@ class AuthManager:
         }
 
     def logout(self, token: str):
-        """Blacklist a token (logout)."""
+        """Blacklist a token (logout) and persist to disk."""
         self.blacklisted_tokens.add(token)
+        self._save_blacklist()  # Persist immediately
 
     # Permission Checking
 

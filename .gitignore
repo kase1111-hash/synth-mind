@@ -33,9 +33,25 @@ ENV/
 *.swo
 *~
 
-# Environment variables
+# Environment variables - NEVER commit actual secrets!
 .env
 .env.local
+.env.production
+.env.*.local
+
+# Credentials and secrets
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+*.pem
+*.key
+*.crt
+private_key*
+service_account*.json
+
+# Auth data directory (contains user passwords and tokens)
+.synth_mind/auth/
 
 # Logs
 *.log

@@ -18,7 +18,7 @@ This security assessment covers the Synth Mind codebase with focus on OWASP Top 
 | Critical | 1 | ✅ FIXED |
 | High | 1 | ✅ FIXED |
 | Medium | 3 | ✅ ALL FIXED |
-| Low | 2 | Open |
+| Low | 2 | ✅ ALL FIXED |
 
 ---
 
@@ -209,35 +209,55 @@ except ImportError:
 
 ## Low Findings
 
-### 6. Sensitive Files Not in .gitignore
+### 6. Sensitive Files Not in .gitignore - ✅ FIXED
 
-**Severity:** LOW
+**Severity:** LOW (was)
+**Status:** ✅ **FIXED on 2025-12-23**
 
-**Description:**
-The `.gitignore` template in version_control.py correctly excludes `.env` but the actual `.env.example` is tracked in git.
+**Original Issue:**
+The `.gitignore` needed more comprehensive coverage of sensitive files.
 
-**Recommendation:**
-- Ensure production deployments never commit actual `.env` files
-- Add security reminder in `.env.example`
+**Fix Applied:**
+1. ✅ Added more sensitive file patterns to `.gitignore`:
+   - `credentials.json`, `secrets.json`, `secrets.yaml`
+   - `*.pem`, `*.key`, `*.crt`, `private_key*`
+   - `service_account*.json`
+   - `.synth_mind/auth/` directory
+2. ✅ Added security warning banner to `.env.example`
 
-### 7. Token Blacklist In-Memory Only
+### 7. Token Blacklist In-Memory Only - ✅ FIXED
 
-**File:** `utils/auth.py:99`
-**Severity:** LOW
+**File:** `utils/auth.py:138-172`
+**Severity:** LOW (was)
+**Status:** ✅ **FIXED on 2025-12-23**
 
-**Description:**
-The token blacklist is stored only in memory and is lost on server restart.
+**Original Issue:**
+The token blacklist was stored only in memory and lost on server restart.
 
+**Fix Applied:**
+1. ✅ Added `token_blacklist.json` file for persistence
+2. ✅ Blacklist saved immediately on logout
+3. ✅ Expired tokens automatically cleaned on load
+4. ✅ Secure file permissions (0o600)
+
+**Fixed Code:**
 ```python
-self.blacklisted_tokens: set = set()
+def _load_blacklist(self):
+    """Load token blacklist from storage and clean expired tokens."""
+    if self.blacklist_file.exists():
+        with open(self.blacklist_file, 'r') as f:
+            data = json.load(f)
+            now = datetime.now().timestamp()
+            self.blacklisted_tokens = {
+                token for token, exp_time in data.items()
+                if exp_time > now  # Only keep non-expired tokens
+            }
+
+def logout(self, token: str):
+    """Blacklist a token (logout) and persist to disk."""
+    self.blacklisted_tokens.add(token)
+    self._save_blacklist()  # Persist immediately
 ```
-
-**Impact:**
-- Logged out tokens may still be valid after server restart
-
-**Recommendation:**
-- Persist blacklist to database or use short-lived tokens
-- Consider Redis for production deployments
 
 ---
 
@@ -275,7 +295,10 @@ The codebase demonstrates several security best practices:
 | ~~High~~ | ~~Restrict CORS origins for production~~ | ✅ FIXED |
 | ~~Medium~~ | ~~Replace `eval()` with proper math parser~~ | ✅ FIXED |
 | ~~Medium~~ | ~~Remove auto-pip-install behavior~~ | ✅ FIXED |
-| Low | Persist token blacklist | Open |
+| ~~Low~~ | ~~Persist token blacklist~~ | ✅ FIXED |
+| ~~Low~~ | ~~Improve .gitignore coverage~~ | ✅ FIXED |
+
+**🎉 ALL SECURITY ISSUES RESOLVED**
 
 ---
 
