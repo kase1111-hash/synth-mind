@@ -18,11 +18,10 @@ try:
     from aiohttp import web
     import aiohttp_cors
 except ImportError:
-    print("Installing required packages...")
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "aiohttp", "aiohttp-cors"])
-    from aiohttp import web
-    import aiohttp_cors
+    raise ImportError(
+        "aiohttp and aiohttp-cors are required for the dashboard server. "
+        "Install them with: pip install aiohttp aiohttp-cors"
+    )
 
 from core.orchestrator import SynthOrchestrator
 from utils.auth import AuthManager, UserRole
@@ -42,12 +41,20 @@ class DashboardServer:
     ]
 
     def __init__(self, orchestrator: SynthOrchestrator, port: int = 8080,
-                 auth_enabled: bool = True):
+                 auth_enabled: bool = True, allowed_origins: list = None):
         self.orchestrator = orchestrator
         self.port = port
         self.auth_enabled = auth_enabled
         self.websockets: Set[web.WebSocketResponse] = set()
         self.state_cache = {}
+
+        # CORS allowed origins (restricted to localhost by default for security)
+        self.allowed_origins = allowed_origins or [
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            f"http://localhost:{port}",
+            f"http://127.0.0.1:{port}",
+        ]
 
         # Initialize authentication
         self.auth = AuthManager() if auth_enabled else None
@@ -96,14 +103,25 @@ class DashboardServer:
         self.app.router.add_get('/timeline', self.serve_timeline)
         self.app.router.add_get('/api/timeline', self.get_timeline_data)
 
-        # Enable CORS
-        cors = aiohttp_cors.setup(self.app, defaults={
-            "*": aiohttp_cors.ResourceOptions(
+        # Enable CORS with restricted origins (security fix)
+        # Only allow localhost by default - configure allowed_origins for production
+        allowed_origins = getattr(self, 'allowed_origins', [
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            f"http://localhost:{self.port}",
+            f"http://127.0.0.1:{self.port}",
+        ])
+
+        cors_config = {}
+        for origin in allowed_origins:
+            cors_config[origin] = aiohttp_cors.ResourceOptions(
                 allow_credentials=True,
-                expose_headers="*",
-                allow_headers="*",
+                expose_headers=["Content-Type", "Authorization"],
+                allow_headers=["Content-Type", "Authorization"],
+                allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             )
-        })
+
+        cors = aiohttp_cors.setup(self.app, defaults=cors_config)
         for route in list(self.app.router.routes()):
             cors.add(route)
     

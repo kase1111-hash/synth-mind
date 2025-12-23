@@ -144,13 +144,29 @@ class ToolManager:
 
     def _calculator(self, expression: str) -> Dict[str, Any]:
         """
-        Safe mathematical expression evaluator.
+        Safe mathematical expression evaluator using AST.
         Supports: +, -, *, /, **, %, parentheses, and math functions.
+        Uses AST parsing instead of eval() for security.
         """
+        import ast
         import math
+        import operator
 
-        # Allowed names for evaluation
-        safe_dict = {
+        # Allowed operators
+        operators = {
+            ast.Add: operator.add,
+            ast.Sub: operator.sub,
+            ast.Mult: operator.mul,
+            ast.Div: operator.truediv,
+            ast.FloorDiv: operator.floordiv,
+            ast.Mod: operator.mod,
+            ast.Pow: operator.pow,
+            ast.USub: operator.neg,
+            ast.UAdd: operator.pos,
+        }
+
+        # Allowed functions
+        functions = {
             "abs": abs,
             "round": round,
             "min": min,
@@ -164,15 +180,65 @@ class ToolManager:
             "log": math.log,
             "log10": math.log10,
             "exp": math.exp,
+            "floor": math.floor,
+            "ceil": math.ceil,
+        }
+
+        # Allowed constants
+        constants = {
             "pi": math.pi,
             "e": math.e,
         }
 
+        def safe_eval(node):
+            """Recursively evaluate AST nodes safely."""
+            if isinstance(node, ast.Expression):
+                return safe_eval(node.body)
+            elif isinstance(node, ast.Constant):  # Python 3.8+
+                if isinstance(node.value, (int, float)):
+                    return node.value
+                raise ValueError(f"Invalid constant: {node.value}")
+            elif isinstance(node, ast.Num):  # Python 3.7 compatibility
+                return node.n
+            elif isinstance(node, ast.Name):
+                if node.id in constants:
+                    return constants[node.id]
+                raise ValueError(f"Unknown variable: {node.id}")
+            elif isinstance(node, ast.BinOp):
+                op_type = type(node.op)
+                if op_type not in operators:
+                    raise ValueError(f"Unsupported operator: {op_type.__name__}")
+                left = safe_eval(node.left)
+                right = safe_eval(node.right)
+                return operators[op_type](left, right)
+            elif isinstance(node, ast.UnaryOp):
+                op_type = type(node.op)
+                if op_type not in operators:
+                    raise ValueError(f"Unsupported operator: {op_type.__name__}")
+                operand = safe_eval(node.operand)
+                return operators[op_type](operand)
+            elif isinstance(node, ast.Call):
+                if not isinstance(node.func, ast.Name):
+                    raise ValueError("Only simple function calls allowed")
+                func_name = node.func.id
+                if func_name not in functions:
+                    raise ValueError(f"Unknown function: {func_name}")
+                args = [safe_eval(arg) for arg in node.args]
+                return functions[func_name](*args)
+            else:
+                raise ValueError(f"Unsupported expression type: {type(node).__name__}")
+
         try:
-            # Remove any potentially dangerous characters
-            clean_expr = re.sub(r'[^0-9+\-*/().,%\s\w]', '', expression)
-            result = eval(clean_expr, {"__builtins__": {}}, safe_dict)
+            # Parse expression into AST
+            tree = ast.parse(expression, mode='eval')
+            result = safe_eval(tree)
             return {"success": True, "result": result, "expression": expression}
+        except SyntaxError as e:
+            return {"success": False, "error": f"Syntax error: {e}", "expression": expression}
+        except ValueError as e:
+            return {"success": False, "error": str(e), "expression": expression}
+        except ZeroDivisionError:
+            return {"success": False, "error": "Division by zero", "expression": expression}
         except Exception as e:
             return {"success": False, "error": str(e), "expression": expression}
 

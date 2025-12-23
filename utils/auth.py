@@ -16,10 +16,10 @@ from enum import Enum
 try:
     import jwt
 except ImportError:
-    import subprocess
-    import sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "PyJWT"])
-    import jwt
+    raise ImportError(
+        "PyJWT is required for authentication. "
+        "Install it with: pip install PyJWT"
+    )
 
 
 class UserRole(Enum):

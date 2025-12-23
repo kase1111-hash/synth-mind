@@ -17,7 +17,7 @@ This security assessment covers the Synth Mind codebase with focus on OWASP Top 
 |----------|-------|--------|
 | Critical | 1 | ✅ FIXED |
 | High | 1 | ✅ FIXED |
-| Medium | 3 | Open |
+| Medium | 3 | ✅ ALL FIXED |
 | Low | 2 | Open |
 
 ---
@@ -111,70 +111,94 @@ resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
 
 ## Medium Findings
 
-### 3. Eval Usage in Calculator
+### 3. Eval Usage in Calculator - ✅ FIXED
 
-**File:** `core/tools.py:160-166`
-**Severity:** MEDIUM
+**File:** `core/tools.py:145-243`
+**Severity:** MEDIUM (was)
 **CVSS Score:** 5.3
+**Status:** ✅ **FIXED on 2025-12-23**
 
-**Description:**
-The calculator uses `eval()` on user input. While mitigated by regex filtering and restricted builtins, `eval()` is inherently risky.
+**Original Issue:**
+The calculator used `eval()` on user input, which is inherently risky.
 
+**Fix Applied:**
+1. ✅ Replaced `eval()` with AST-based parser
+2. ✅ Only allows specific node types (Constant, Num, Name, BinOp, UnaryOp, Call)
+3. ✅ Whitelist of allowed operators and functions
+4. ✅ No arbitrary code execution possible
+
+**Fixed Code:**
 ```python
-clean_expr = re.sub(r'[^0-9+\-*/().,%\s\w]', '', expression)
-result = eval(clean_expr, {"__builtins__": {}}, safe_dict)
+def safe_eval(node):
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, (int, float)):
+            return node.value
+        raise ValueError(f"Invalid constant")
+    elif isinstance(node, ast.BinOp):
+        # Only allowed operators
+        ...
 ```
 
-**Current Mitigations:**
-- Regex removes most dangerous characters
-- `__builtins__` set to empty dict
-- Limited `safe_dict` with only math functions
+**Verification Tests Passed:**
+- Basic arithmetic ✓
+- Math functions (sqrt, sin, cos) ✓
+- Constants (pi, e) ✓
+- Code injection blocked (__import__) ✓
+- Attribute access blocked ✓
+- exec/eval blocked ✓
 
-**Recommendation:**
-- Consider using `ast.literal_eval()` or a proper math parser library
-- Add comprehensive test cases for bypass attempts
+### 4. Overly Permissive CORS Configuration - ✅ FIXED
 
-### 4. Overly Permissive CORS Configuration
-
-**File:** `dashboard/server.py:100-106`
-**Severity:** MEDIUM
+**File:** `dashboard/server.py:99-119`
+**Severity:** MEDIUM (was)
 **CVSS Score:** 5.0
+**Status:** ✅ **FIXED on 2025-12-23**
 
-**Description:**
-CORS is configured with wildcard origin `"*"`, allowing any website to make authenticated requests.
+**Original Issue:**
+CORS was configured with wildcard origin `"*"`, allowing any website to make requests.
 
+**Fix Applied:**
+1. ✅ Restricted to localhost origins by default
+2. ✅ Configurable via `allowed_origins` parameter
+3. ✅ Limited exposed/allowed headers to necessary ones only
+4. ✅ Explicit method allowlist
+
+**Fixed Code:**
 ```python
-cors = aiohttp_cors.setup(self.app, defaults={
-    "*": aiohttp_cors.ResourceOptions(
+allowed_origins = ["http://localhost:8080", "http://127.0.0.1:8080", ...]
+for origin in allowed_origins:
+    cors_config[origin] = aiohttp_cors.ResourceOptions(
         allow_credentials=True,
-        expose_headers="*",
-        allow_headers="*",
+        expose_headers=["Content-Type", "Authorization"],
+        allow_headers=["Content-Type", "Authorization"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     )
-})
 ```
 
-**Impact:**
-- Cross-site request forgery possible if authentication tokens are accessible
-- Sensitive data exposure to malicious websites
+### 5. Auto-Install of Python Packages - ✅ FIXED
 
-**Recommendation:**
-- Configure specific allowed origins for production deployment
-- Remove `allow_credentials=True` if not needed
-
-### 5. Auto-Install of Python Packages
-
-**Files:** `utils/auth.py:19-22`, `dashboard/server.py:22-25`
-**Severity:** MEDIUM
+**Files:** `utils/auth.py:16-22`, `dashboard/server.py:17-24`
+**Severity:** MEDIUM (was)
 **CVSS Score:** 4.8
+**Status:** ✅ **FIXED on 2025-12-23**
 
-**Description:**
-The code automatically installs Python packages via pip if they're missing, which could introduce supply chain risks.
+**Original Issue:**
+The code automatically installed Python packages via pip if missing, introducing supply chain risks.
 
+**Fix Applied:**
+1. ✅ Removed automatic pip install
+2. ✅ Now raises helpful ImportError with install instructions
+3. ✅ User must explicitly install dependencies
+
+**Fixed Code:**
 ```python
-except ImportError:
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "PyJWT"])
+try:
     import jwt
+except ImportError:
+    raise ImportError(
+        "PyJWT is required for authentication. "
+        "Install it with: pip install PyJWT"
+    )
 ```
 
 **Recommendation:**
@@ -248,9 +272,9 @@ The codebase demonstrates several security best practices:
 |----------|--------|--------|
 | ~~Immediate~~ | ~~Fix command injection in `_shell_run`~~ | ✅ FIXED |
 | ~~Immediate~~ | ~~Implement actual timeout in `_code_execute`~~ | ✅ FIXED |
-| High | Restrict CORS origins for production | Open |
-| Medium | Replace `eval()` with proper math parser | Open |
-| Medium | Remove auto-pip-install behavior | Open |
+| ~~High~~ | ~~Restrict CORS origins for production~~ | ✅ FIXED |
+| ~~Medium~~ | ~~Replace `eval()` with proper math parser~~ | ✅ FIXED |
+| ~~Medium~~ | ~~Remove auto-pip-install behavior~~ | ✅ FIXED |
 | Low | Persist token blacklist | Open |
 
 ---
