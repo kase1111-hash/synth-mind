@@ -78,7 +78,22 @@ class MemorySystem:
                 metadata TEXT
             )
         """)
-        
+
+        # Uncertainty log for self-healing (Query Rating system)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS uncertainty_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp REAL,
+                user_message TEXT,
+                parsed_intent TEXT,
+                confidence_score REAL,
+                context TEXT,
+                signals TEXT,
+                resolved INTEGER DEFAULT 0,
+                resolution_pattern TEXT
+            )
+        """)
+
         self.db.commit()
     
     def _init_vector_store(self):
@@ -199,7 +214,141 @@ class MemorySystem:
         """Detect if context coherence has drifted."""
         # In production: embedding similarity analysis
         return False  # Placeholder
-    
+
+    # ============================================
+    # Self-Healing Query Rating System
+    # ============================================
+
+    def log_uncertainty(
+        self,
+        user_message: str,
+        parsed_intent: str,
+        confidence_score: float,
+        context: str,
+        signals: Dict[str, float]
+    ) -> int:
+        """
+        Log an uncertainty event for later pattern analysis.
+        Called when confidence is below threshold or intent is ambiguous.
+        Returns the log entry ID.
+        """
+        cursor = self.db.cursor()
+        cursor.execute(
+            """
+            INSERT INTO uncertainty_log
+            (timestamp, user_message, parsed_intent, confidence_score, context, signals)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                time.time(),
+                user_message,
+                parsed_intent,
+                confidence_score,
+                context[:2000] if context else "",  # Limit context size
+                json.dumps(signals)
+            )
+        )
+        self.db.commit()
+        return cursor.lastrowid
+
+    def get_uncertainty_logs(
+        self,
+        limit: int = 500,
+        unresolved_only: bool = False,
+        min_confidence: float = 0.0,
+        max_confidence: float = 1.0
+    ) -> List[Dict]:
+        """
+        Retrieve uncertainty logs for pattern analysis.
+        Used by the harvest cycle to identify linguistic patterns.
+        """
+        cursor = self.db.cursor()
+
+        query = """
+            SELECT id, timestamp, user_message, parsed_intent,
+                   confidence_score, context, signals, resolved, resolution_pattern
+            FROM uncertainty_log
+            WHERE confidence_score >= ? AND confidence_score <= ?
+        """
+        params = [min_confidence, max_confidence]
+
+        if unresolved_only:
+            query += " AND resolved = 0"
+
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, params)
+
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                "id": row[0],
+                "timestamp": row[1],
+                "user_message": row[2],
+                "parsed_intent": row[3],
+                "confidence_score": row[4],
+                "context": row[5],
+                "signals": json.loads(row[6]) if row[6] else {},
+                "resolved": bool(row[7]),
+                "resolution_pattern": row[8]
+            })
+
+        return results
+
+    def mark_uncertainty_resolved(
+        self,
+        log_id: int,
+        resolution_pattern: str
+    ):
+        """
+        Mark an uncertainty log entry as resolved with the pattern that fixed it.
+        Called after pattern harvest identifies a fix.
+        """
+        cursor = self.db.cursor()
+        cursor.execute(
+            """
+            UPDATE uncertainty_log
+            SET resolved = 1, resolution_pattern = ?
+            WHERE id = ?
+            """,
+            (resolution_pattern, log_id)
+        )
+        self.db.commit()
+
+    def get_uncertainty_stats(self) -> Dict:
+        """Get statistics about uncertainty logs for monitoring."""
+        cursor = self.db.cursor()
+
+        # Total count
+        cursor.execute("SELECT COUNT(*) FROM uncertainty_log")
+        total = cursor.fetchone()[0]
+
+        # Unresolved count
+        cursor.execute("SELECT COUNT(*) FROM uncertainty_log WHERE resolved = 0")
+        unresolved = cursor.fetchone()[0]
+
+        # Average confidence
+        cursor.execute("SELECT AVG(confidence_score) FROM uncertainty_log")
+        avg_confidence = cursor.fetchone()[0] or 0.0
+
+        # Recent count (last 24 hours)
+        day_ago = time.time() - 86400
+        cursor.execute(
+            "SELECT COUNT(*) FROM uncertainty_log WHERE timestamp > ?",
+            (day_ago,)
+        )
+        recent = cursor.fetchone()[0]
+
+        return {
+            "total_entries": total,
+            "unresolved": unresolved,
+            "resolved": total - unresolved,
+            "resolution_rate": (total - unresolved) / total if total > 0 else 0.0,
+            "avg_confidence": avg_confidence,
+            "last_24h": recent
+        }
+
     async def save_state(self):
         """Save all state to disk."""
         if self.db:

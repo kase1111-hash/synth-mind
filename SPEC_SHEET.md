@@ -18,7 +18,7 @@
 | Dashboard | ✅ Complete | WebSocket server with inline fallback |
 | CLI Commands | ✅ Complete | All documented commands work |
 | Peer Networking | ✅ Complete | API endpoint ready |
-| Self-Healing (Query Rating) | ❌ Design Only | Documented but not implemented |
+| Self-Healing (Query Rating) | ✅ Complete | Logging + harvest utility implemented |
 | Advanced Tools | ⚠️ Minimal | Only calculator & timer tools |
 | Embeddings | ⚠️ Placeholder | Uses hash-based fallback, not real embeddings |
 
@@ -55,12 +55,18 @@
 | `config/personality.yaml` | Empty file | Personality profiles not configured |
 | `config/peers.txt` | Empty file | No peers configured by default |
 
+#### ✅ Recently Implemented
+
+| Component | File | Notes |
+|-----------|------|-------|
+| Uncertainty Logging | `core/memory.py` | `uncertainty_log` table with full CRUD |
+| Query Rating Integration | `psychological/assurance_resolution.py` | Auto-logs low-confidence responses |
+| Pattern Harvest Utility | `utils/harvest_patterns.py` | CLI tool for analysis + LLM-powered patterns |
+
 #### ❌ Not Implemented (Design/Roadmap Only)
 
 | Feature | Documentation | Notes |
 |---------|---------------|-------|
-| Self-Healing Query System | `Query-Rating.md` | `uncertainty_log.db` not created |
-| Pattern Harvest Cycle | `Query-Rating.md` | No batch analysis implemented |
 | Voice Interface | README roadmap | Whisper + TTS not integrated |
 | Advanced Tool Integration | README roadmap | Code execution, web search missing |
 | Fine-tuned Embeddings | README roadmap | Using placeholder embeddings |
@@ -379,28 +385,55 @@ POST /api/generate
 
 ## Self-Healing System (Query Rating)
 
-### Contract Header Rule
-```
-If uncertain how to interpret user intent:
-→ Do NOT guess or hallucinate
-→ Reply: "I'm not 100% sure what you mean here. Can you clarify?"
-→ Log to uncertainty_log.db
-```
+**Status:** ✅ Implemented
+
+### How It Works
+
+1. **Automatic Logging**: When confidence drops below 80%, the Assurance module logs the uncertainty
+2. **Pattern Harvest**: Run `python utils/harvest_patterns.py` to analyze patterns
+3. **LLM Analysis**: Use `--analyze` flag for AI-powered pattern detection
 
 ### Uncertainty Log Schema
 ```sql
-uncertainty_log(
-  id,
-  timestamp,
-  user_message,
-  parsed_intent,
-  confidence_score,
-  context
-)
+CREATE TABLE uncertainty_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp REAL,
+    user_message TEXT,
+    parsed_intent TEXT,
+    confidence_score REAL,
+    context TEXT,
+    signals TEXT,           -- JSON of signal weights
+    resolved INTEGER,       -- 0 or 1
+    resolution_pattern TEXT -- What fixed it
+);
 ```
 
+### CLI Commands
+
+```bash
+# Show statistics
+python utils/harvest_patterns.py --stats
+
+# Run simple pattern analysis
+python utils/harvest_patterns.py
+
+# Run LLM-powered analysis (requires API key)
+python utils/harvest_patterns.py --analyze
+
+# Export patterns to file
+python utils/harvest_patterns.py --export patterns.yaml
+```
+
+### Integration Points
+
+| Component | Integration |
+|-----------|-------------|
+| `AssuranceResolutionModule` | Logs uncertainties when confidence < 80% |
+| `MemorySystem` | Stores/retrieves uncertainty logs |
+| `harvest_patterns.py` | Analyzes logs, proposes improvements |
+
 ### Pattern Harvest Cycle
-- Monthly batch analysis of uncertainty logs
+- Run periodically (recommended: weekly or after 100+ entries)
 - LLM identifies repeating patterns and synonyms
 - Generates new templates and test cases
 - Progressive reduction: ~25-30% per cycle
@@ -582,9 +615,9 @@ synth-mind/
 - [x] CLI with all commands
 - [x] Multi-LLM provider support (Anthropic, OpenAI, Ollama)
 - [x] Persistent memory system (SQLite)
+- [x] Self-healing query system (uncertainty logging + pattern harvest)
 
 ### ⚠️ Partially Complete
-- [~] Self-healing query system (design documented, not implemented)
 - [~] Tool manager (basic tools only: calculator, timer)
 - [~] Embedding system (placeholder, not production-ready)
 - [~] Dashboard visualization (simplified inline version)
