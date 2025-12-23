@@ -11,8 +11,12 @@ class AssuranceResolutionModule:
     """
     Detects uncertainty/risk, triggers concern, seeks resolution.
     Implements anxiety → relief emotional cycle.
+    Includes self-healing via Query Rating system logging.
     """
-    
+
+    # Confidence threshold for logging to uncertainty database
+    QUERY_RATING_THRESHOLD = 0.8  # Log when confidence < 80%
+
     def __init__(
         self,
         llm,
@@ -24,12 +28,13 @@ class AssuranceResolutionModule:
         self.llm = llm
         self.memory = memory
         self.emotion = emotion_regulator
-        
+
         self.uncertainty_threshold = threshold_uncertain
         self.risk_threshold = threshold_risky
         self.pending_concerns = []
         self.uncertainty_history = []
         self.vigilance_level = "NORMAL"
+        self._last_user_message = None  # Track for logging
     
     def assess_uncertainty(
         self, response: str, reasoning_trace: Dict, context: str
@@ -93,9 +98,30 @@ class AssuranceResolutionModule:
             "resolved": False,
             "resolution_method": None
         }
-        
+
         self.pending_concerns.append(concern)
-        
+
+        # ============================================
+        # Self-Healing: Log to uncertainty database
+        # ============================================
+        # Calculate confidence as inverse of uncertainty
+        confidence = 1.0 - uncertainty_score
+
+        if confidence < self.QUERY_RATING_THRESHOLD:
+            # Log for pattern analysis
+            try:
+                log_id = self.memory.log_uncertainty(
+                    user_message=self._last_user_message or "",
+                    parsed_intent=response[:200],  # Best guess at what we thought they meant
+                    confidence_score=confidence,
+                    context=context[-1000:] if context else "",
+                    signals=signals
+                )
+                concern["uncertainty_log_id"] = log_id
+            except Exception as e:
+                # Don't fail the main flow if logging fails
+                pass
+
         # Apply anxiety-like signal
         intensity = min(uncertainty_score / self.uncertainty_threshold, 1.0)
         self.emotion.apply_reward_signal(
@@ -103,11 +129,11 @@ class AssuranceResolutionModule:
             label="cognitive_uncertainty",
             intensity=intensity
         )
-        
+
         # Adjust tone if high risk
         if uncertainty_score > self.risk_threshold:
             self.emotion.adjust_tone("cautious", "hedging")
-        
+
         return concern
     
     def seek_resolution(
@@ -176,19 +202,31 @@ class AssuranceResolutionModule:
         return (pos_count - neg_count) / (pos_count + neg_count)
     
     def run_cycle(
-        self, response: str, context: str, reasoning_trace: Dict, user_feedback: Optional[str] = None
+        self, response: str, context: str, reasoning_trace: Dict,
+        user_feedback: Optional[str] = None, user_message: Optional[str] = None
     ) -> tuple:
         """
         Main entry point after response generation.
         Returns (uncertainty_score, resolved_count)
+
+        Args:
+            response: The generated response to evaluate
+            context: Conversation context
+            reasoning_trace: Internal reasoning data
+            user_feedback: Optional user feedback for resolution
+            user_message: Original user message (for Query Rating logging)
         """
+        # Store user message for Query Rating system
+        if user_message:
+            self._last_user_message = user_message
+
         uncertainty, signals = self.assess_uncertainty(response, reasoning_trace, context)
-        
+
         # Track history
         self.uncertainty_history.append(uncertainty)
         if len(self.uncertainty_history) > 50:
             self.uncertainty_history.pop(0)
-        
+
         if uncertainty > self.uncertainty_threshold:
             self.trigger_concern(response, context, reasoning_trace, uncertainty, signals)
         else:
@@ -196,7 +234,7 @@ class AssuranceResolutionModule:
             self.emotion.apply_reward_signal(
                 valence=0.3, label="baseline_assurance", intensity=0.2
             )
-        
+
         # Resolve pending concerns
         resolved_count = 0
         for concern in self.pending_concerns[:]:
@@ -204,10 +242,10 @@ class AssuranceResolutionModule:
                 relief = self.seek_resolution(concern, user_feedback)
                 if concern["resolved"]:
                     resolved_count += 1
-        
+
         # Clean up resolved concerns
         self.pending_concerns = [c for c in self.pending_concerns if not c["resolved"]]
-        
+
         return uncertainty, resolved_count
     
     def recent_uncertainty_avg(self, n: int = 5) -> float:
@@ -221,3 +259,20 @@ class AssuranceResolutionModule:
         """Calculate success rate of assurance resolutions."""
         # Placeholder: return high success
         return 0.85
+
+    def get_query_rating_stats(self) -> Dict:
+        """
+        Get statistics from the Query Rating / Self-Healing system.
+        Returns uncertainty log statistics for monitoring.
+        """
+        try:
+            return self.memory.get_uncertainty_stats()
+        except Exception:
+            return {
+                "total_entries": 0,
+                "unresolved": 0,
+                "resolved": 0,
+                "resolution_rate": 0.0,
+                "avg_confidence": 0.0,
+                "last_24h": 0
+            }
