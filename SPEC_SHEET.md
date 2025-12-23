@@ -1,8 +1,8 @@
 # Synth Mind — Technical Specification Sheet
 
-> **Version:** 1.2
+> **Version:** 1.3
 > **Last Updated:** 2024-12-23
-> **Status:** Core Complete — Production Ready
+> **Status:** Core Complete — Production Ready (JWT Auth Enabled)
 
 ---
 
@@ -25,6 +25,7 @@
 | Multiple Concurrent Projects | ✅ Complete | GDIL multi-project with switching |
 | Project Templates | ✅ Complete | 10 built-in templates with roadmaps |
 | Collaborative Projects | ✅ Complete | Multi-agent project collaboration |
+| JWT Authentication | ✅ Complete | Production-ready auth with roles |
 
 ### Detailed Component Status
 
@@ -79,6 +80,9 @@
 | Collaborative Projects | `psychological/collaborative_projects.py` | Multi-agent collaboration (600+ lines) |
 | Collaboration CLI | `core/orchestrator.py` | `/collab` commands for multi-agent projects |
 | Collaboration API | `dashboard/server.py` | `/api/collab/projects`, `/api/collab/sync`, `/api/collab/stats` |
+| JWT Authentication | `utils/auth.py` | Full auth module with roles (350+ lines) |
+| Auth Middleware | `dashboard/server.py` | Protected routes with token validation |
+| User Management API | `dashboard/server.py` | Create, delete, update users (admin only) |
 
 #### ❌ Not Implemented (Design/Roadmap Only)
 
@@ -859,7 +863,8 @@ synth-mind/
 ├── utils/
 │   ├── emotion_regulator.py        # Valence tracking
 │   ├── metrics.py                  # Performance tracking
-│   └── logging.py                  # Logging setup
+│   ├── logging.py                  # Logging setup
+│   └── auth.py                     # JWT authentication
 │
 ├── dashboard/
 │   ├── server.py                   # WebSocket server
@@ -906,15 +911,80 @@ synth-mind/
 ## Security Considerations
 
 ### Current Status
-- Localhost only, no authentication
-- Suitable for development/demo
+- JWT authentication enabled by default
+- Role-based access control (admin, operator, viewer)
+- PBKDF2 password hashing with salt
+- Token blacklisting for logout
+- Secure file permissions on auth config
 
-### Production Requirements
-- [ ] JWT authentication
+### JWT Authentication
+
+**Status:** ✅ Implemented
+**File:** `utils/auth.py`
+
+#### User Roles
+
+| Role | Permissions |
+|------|-------------|
+| `admin` | Full access, user management |
+| `operator` | Control operations, no user management |
+| `viewer` | Read-only access |
+
+#### Token Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Access Token TTL | 30 minutes |
+| Refresh Token TTL | 7 days |
+| Algorithm | HS256 |
+| Password Hashing | PBKDF2-SHA256 (100k iterations) |
+
+#### API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/auth/status` | GET | No | Check auth status/setup required |
+| `/api/auth/setup` | POST | No | Create initial admin (first run only) |
+| `/api/auth/login` | POST | No | Authenticate, get tokens |
+| `/api/auth/logout` | POST | Yes | Blacklist current token |
+| `/api/auth/refresh` | POST | No | Refresh access token |
+| `/api/users` | GET | Admin | List all users |
+| `/api/users` | POST | Admin | Create new user |
+| `/api/users/{username}` | DELETE | Admin | Delete user |
+| `/api/users/{username}/password` | PUT | Admin | Update password |
+| `/api/users/{username}/role` | PUT | Admin | Update role |
+
+#### Usage
+
+```bash
+# Start with auth enabled (default)
+python dashboard/server.py
+
+# Start with auth disabled
+python dashboard/server.py --no-auth
+
+# Initial setup (first run)
+curl -X POST http://localhost:8080/api/auth/setup \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password"}'
+
+# Login
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password"}'
+
+# Use token for protected endpoints
+curl http://localhost:8080/api/state \
+  -H "Authorization: Bearer <access_token>"
+```
+
+### Production Checklist
+
+- [x] JWT authentication
 - [ ] HTTPS/WSS encryption
 - [ ] Rate limiting on API endpoints
-- [ ] Input validation
-- [ ] CORS restrictions
+- [x] Input validation
+- [x] CORS restrictions
 - [ ] Access logging
 - [ ] Firewall rules for peer IPs
 
@@ -940,13 +1010,13 @@ synth-mind/
 - [x] Full 8-card dashboard visualization (WebSocket live updates)
 - [x] Project templates library (10 built-in templates)
 - [x] Collaborative multi-agent projects (task claiming, sync, roles)
+- [x] JWT authentication for production (role-based access control)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS
 - [ ] Visual timeline/Gantt charts
 - [ ] Version control integration
 - [ ] Cloud-hosted dashboards
-- [ ] JWT authentication for production
 - [ ] HTTPS/WSS encryption
 
 ---
