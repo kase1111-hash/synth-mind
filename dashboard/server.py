@@ -2,10 +2,12 @@
 Dashboard Server - WebSocket server for real-time state streaming.
 Serves the HTML dashboard and broadcasts internal state updates.
 Includes JWT authentication for production security.
+Supports HTTPS/WSS encryption for secure communication.
 """
 
 import asyncio
 import json
+import ssl
 import sys
 from pathlib import Path
 from typing import Set, Optional
@@ -41,17 +43,50 @@ class DashboardServer:
     ]
 
     def __init__(self, orchestrator: SynthOrchestrator, port: int = 8080,
-                 auth_enabled: bool = True, allowed_origins: list = None):
+                 auth_enabled: bool = True, allowed_origins: list = None,
+                 ssl_cert: str = None, ssl_key: str = None,
+                 ssl_context: ssl.SSLContext = None):
+        """
+        Initialize the dashboard server.
+
+        Args:
+            orchestrator: The SynthOrchestrator instance
+            port: Server port (default: 8080)
+            auth_enabled: Enable JWT authentication (default: True)
+            allowed_origins: List of allowed CORS origins
+            ssl_cert: Path to SSL certificate file (enables HTTPS)
+            ssl_key: Path to SSL private key file
+            ssl_context: Pre-configured SSLContext (overrides ssl_cert/ssl_key)
+        """
         self.orchestrator = orchestrator
         self.port = port
         self.auth_enabled = auth_enabled
         self.websockets: Set[web.WebSocketResponse] = set()
         self.state_cache = {}
 
+        # SSL/TLS configuration
+        self.ssl_context = ssl_context
+        self.ssl_cert = ssl_cert
+        self.ssl_key = ssl_key
+        self.is_https = False
+
+        # Initialize SSL context if cert/key provided
+        if ssl_cert and ssl_key and not ssl_context:
+            self.ssl_context = self._create_ssl_context(ssl_cert, ssl_key)
+
+        if self.ssl_context:
+            self.is_https = True
+
+        # Determine protocol for CORS
+        protocol = "https" if self.is_https else "http"
+
         # CORS allowed origins (restricted to localhost by default for security)
         self.allowed_origins = allowed_origins or [
-            "http://localhost:8080",
-            "http://127.0.0.1:8080",
+            f"{protocol}://localhost:8080",
+            f"{protocol}://127.0.0.1:8080",
+            f"{protocol}://localhost:{port}",
+            f"{protocol}://127.0.0.1:{port}",
+            # Also allow HTTP origins when using HTTPS (for redirects)
             f"http://localhost:{port}",
             f"http://127.0.0.1:{port}",
         ]
@@ -67,6 +102,18 @@ class DashboardServer:
 
         # Setup routes
         self._setup_routes()
+
+    def _create_ssl_context(self, cert_path: str, key_path: str) -> ssl.SSLContext:
+        """Create SSL context from certificate and key files."""
+        try:
+            from utils.ssl_utils import create_ssl_context
+            return create_ssl_context(cert_path, key_path)
+        except ImportError:
+            # Fallback if ssl_utils not available
+            ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_context.load_cert_chain(cert_path, key_path)
+            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            return ssl_context
         
     def _setup_routes(self):
         """Setup HTTP and WebSocket routes."""
@@ -1061,9 +1108,11 @@ class DashboardServer:
     </div>
     <script>
         let ws;
-        
+
         function connect() {
-            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            // Use WSS for HTTPS, WS for HTTP
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
             
             ws.onopen = () => {
                 document.getElementById('ws-status').textContent = 'Connected';
@@ -1115,18 +1164,38 @@ class DashboardServer:
                 await self.broadcast_state()
     
     async def start(self):
-        """Start the server."""
+        """Start the server with optional HTTPS/WSS support."""
         # Start background broadcaster
         asyncio.create_task(self.start_background_broadcast())
 
         # Start web server
         runner = web.AppRunner(self.app)
         await runner.setup()
-        site = web.TCPSite(runner, 'localhost', self.port)
+
+        # Use SSL if configured
+        if self.ssl_context:
+            site = web.TCPSite(
+                runner,
+                'localhost',
+                self.port,
+                ssl_context=self.ssl_context
+            )
+            protocol = "https"
+            ws_protocol = "wss"
+        else:
+            site = web.TCPSite(runner, 'localhost', self.port)
+            protocol = "http"
+            ws_protocol = "ws"
+
         await site.start()
 
         print(f"\n{'='*60}")
-        print(f"  Dashboard server running at http://localhost:{self.port}")
+        print(f"  Dashboard server running at {protocol}://localhost:{self.port}")
+        if self.is_https:
+            print(f"  WebSocket endpoint: {ws_protocol}://localhost:{self.port}/ws")
+            print(f"  TLS: ENABLED (TLS 1.2+)")
+            if self.ssl_cert:
+                print(f"  Certificate: {self.ssl_cert}")
         print(f"{'='*60}")
 
         # Show authentication status
@@ -1156,7 +1225,35 @@ async def main():
     parser = argparse.ArgumentParser(description='Synth Mind Dashboard Server')
     parser.add_argument('--port', type=int, default=8080, help='Server port (default: 8080)')
     parser.add_argument('--no-auth', action='store_true', help='Disable authentication')
+
+    # SSL/TLS options
+    ssl_group = parser.add_argument_group('SSL/TLS Options')
+    ssl_group.add_argument('--ssl-cert', type=str, help='Path to SSL certificate file')
+    ssl_group.add_argument('--ssl-key', type=str, help='Path to SSL private key file')
+    ssl_group.add_argument('--ssl-dev', action='store_true',
+                          help='Generate/use self-signed certificate for development')
+
     args = parser.parse_args()
+
+    # Handle SSL configuration
+    ssl_cert = args.ssl_cert
+    ssl_key = args.ssl_key
+
+    # Generate development certificates if requested
+    if args.ssl_dev:
+        try:
+            from utils.ssl_utils import get_or_create_dev_certs
+            ssl_cert, ssl_key = get_or_create_dev_certs()
+            print("\nUsing development SSL certificates (self-signed)")
+            print("Note: You may need to accept the certificate in your browser\n")
+        except ImportError as e:
+            print(f"Warning: Could not generate dev certificates: {e}")
+            print("Install cryptography: pip install cryptography")
+            ssl_cert = ssl_key = None
+
+    # Validate SSL arguments
+    if (ssl_cert and not ssl_key) or (ssl_key and not ssl_cert):
+        parser.error("Both --ssl-cert and --ssl-key are required for HTTPS")
 
     print("Initializing Synth Mind with dashboard...")
 
@@ -1168,7 +1265,9 @@ async def main():
     server = DashboardServer(
         orchestrator,
         port=args.port,
-        auth_enabled=not args.no_auth
+        auth_enabled=not args.no_auth,
+        ssl_cert=ssl_cert,
+        ssl_key=ssl_key
     )
 
     # Start both server and orchestrator

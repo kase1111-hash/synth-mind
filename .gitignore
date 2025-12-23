@@ -50,6 +50,9 @@ secrets.yml
 private_key*
 service_account*.json
 
+# SSL certificates directory
+certs/
+
 # Auth data directory (contains user passwords and tokens)
 .synth_mind/auth/
 

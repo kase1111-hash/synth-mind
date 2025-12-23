@@ -664,7 +664,9 @@
             statusEl.textContent = 'Connecting...';
             statusEl.className = 'connection-status connecting';
 
-            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            // Use WSS for HTTPS, WS for HTTP
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
 
             ws.onopen = () => {
                 console.log('WebSocket connected');

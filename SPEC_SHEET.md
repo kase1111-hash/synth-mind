@@ -97,7 +97,6 @@
 | Feature | Documentation | Notes |
 |---------|---------------|-------|
 | Voice Interface | README roadmap | Whisper + TTS not integrated |
-| Version Control Integration | GDIL_COMPLETE.md | No Git integration |
 
 ---
 
@@ -947,7 +946,8 @@ synth-mind/
 │   ├── metrics.py                  # Performance tracking
 │   ├── logging.py                  # Logging setup
 │   ├── auth.py                     # JWT authentication
-│   └── version_control.py          # Git VCS integration
+│   ├── version_control.py          # Git VCS integration
+│   └── ssl_utils.py                # SSL/TLS certificate utilities
 │
 ├── dashboard/
 │   ├── server.py                   # WebSocket server
@@ -967,6 +967,13 @@ synth-mind/
 │   ├── memory.db                   # Episodic/semantic storage
 │   ├── embeddings/                 # Vector store
 │   └── synth.log                   # Application logs
+│
+├── certs/                          # Auto-generated (gitignored)
+│   ├── server.crt                  # SSL certificate
+│   └── server.key                  # SSL private key
+│
+├── tests/
+│   └── test_security_e2e.py        # Security test suite
 │
 └── docs/
     ├── QUICKSTART.md               # 5-minute setup guide
@@ -1062,10 +1069,73 @@ curl http://localhost:8080/api/state \
   -H "Authorization: Bearer <access_token>"
 ```
 
+### HTTPS/WSS Encryption
+
+**Status:** ✅ Implemented
+**Files:** `dashboard/server.py`, `utils/ssl_utils.py`
+
+#### Overview
+
+The dashboard server supports HTTPS and WSS (WebSocket Secure) for encrypted communication. This ensures all data transmitted between the browser and server is protected.
+
+#### Features
+
+| Feature | Description |
+|---------|-------------|
+| TLS 1.2+ | Minimum TLS version enforced |
+| Self-signed Certs | Auto-generate dev certificates |
+| Custom Certificates | Use your own CA-signed certs |
+| WSS Auto-detection | Dashboard auto-switches to WSS on HTTPS |
+
+#### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `--ssl-cert PATH` | Path to SSL certificate file |
+| `--ssl-key PATH` | Path to SSL private key file |
+| `--ssl-dev` | Generate/use self-signed certificate for development |
+
+#### Usage Examples
+
+```bash
+# Development: Auto-generate self-signed certificate
+python dashboard/server.py --ssl-dev
+
+# Production: Use your own certificates
+python dashboard/server.py --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem
+
+# Combined with other options
+python dashboard/server.py --ssl-dev --port 8443 --no-auth
+```
+
+#### Certificate Generation
+
+For development, use the `--ssl-dev` flag which automatically generates self-signed certificates in the `certs/` directory.
+
+For production, you can:
+1. Use Let's Encrypt for free CA-signed certificates
+2. Generate certificates manually:
+   ```bash
+   python utils/ssl_utils.py --generate --hostname yourdomain.com
+   ```
+
+#### Certificate Utilities
+
+```bash
+# Generate self-signed certificate
+python utils/ssl_utils.py --generate
+
+# View certificate info
+python utils/ssl_utils.py --info certs/server.crt
+
+# Custom options
+python utils/ssl_utils.py --generate --hostname mydomain.com --days 365
+```
+
 ### Production Checklist
 
 - [x] JWT authentication
-- [ ] HTTPS/WSS encryption
+- [x] HTTPS/WSS encryption
 - [ ] Rate limiting on API endpoints
 - [x] Input validation
 - [x] CORS restrictions
@@ -1096,12 +1166,12 @@ curl http://localhost:8080/api/state \
 - [x] Collaborative multi-agent projects (task claiming, sync, roles)
 - [x] JWT authentication for production (role-based access control)
 - [x] Visual timeline/Gantt charts (interactive project visualization)
+- [x] Version control integration (Git auto-commit, rollback, changelog)
+- [x] HTTPS/WSS encryption (TLS 1.2+, self-signed cert generation)
 
 ### ❌ Not Started
 - [ ] Voice interface (Whisper + TTS) — planned for Agent OS
-- [ ] Version control integration
 - [ ] Cloud-hosted dashboards
-- [ ] HTTPS/WSS encryption
 
 ---
 
