@@ -34,6 +34,7 @@ class DashboardServer:
     PUBLIC_PATHS = [
         '/',
         '/ws',
+        '/timeline',
         '/api/auth/login',
         '/api/auth/setup',
         '/api/auth/status',
@@ -91,6 +92,10 @@ class DashboardServer:
         self.app.router.add_put('/api/users/{username}/password', self.update_password)
         self.app.router.add_put('/api/users/{username}/role', self.update_role)
 
+        # Timeline / Gantt Chart API
+        self.app.router.add_get('/timeline', self.serve_timeline)
+        self.app.router.add_get('/api/timeline', self.get_timeline_data)
+
         # Enable CORS
         cors = aiohttp_cors.setup(self.app, defaults={
             "*": aiohttp_cors.ResourceOptions(
@@ -105,14 +110,144 @@ class DashboardServer:
     async def serve_dashboard(self, request):
         """Serve the HTML dashboard."""
         dashboard_path = Path(__file__).parent / 'dashboard.html'
-        
+
         # If dashboard.html doesn't exist, return inline version
         if not dashboard_path.exists():
             html = self._get_inline_dashboard()
             return web.Response(text=html, content_type='text/html')
-        
+
         return web.FileResponse(dashboard_path)
-    
+
+    async def serve_timeline(self, request):
+        """Serve the timeline/Gantt chart page."""
+        timeline_path = Path(__file__).parent / 'timeline.html'
+
+        if not timeline_path.exists():
+            return web.Response(
+                text="<h1>Timeline not available</h1><p>timeline.html not found</p>",
+                content_type='text/html'
+            )
+
+        return web.FileResponse(timeline_path)
+
+    async def get_timeline_data(self, request):
+        """Get project timeline data for Gantt chart visualization."""
+        try:
+            projects = []
+
+            # Get GDIL projects
+            if hasattr(self.orchestrator, 'gdil') and self.orchestrator.gdil:
+                gdil = self.orchestrator.gdil
+                for project_id, project in gdil.projects.items():
+                    # Extract roadmap tasks
+                    roadmap = project.get('roadmap', [])
+                    tasks = []
+
+                    for i, task in enumerate(roadmap):
+                        task_data = {
+                            'id': f"{project_id}_task_{i}",
+                            'name': task.get('name', f'Task {i + 1}'),
+                            'status': self._normalize_task_status(task, project),
+                            'priority': task.get('priority', 3),
+                            'dependencies': task.get('dependencies', []),
+                            'progress': self._calculate_task_progress(task, project)
+                        }
+                        tasks.append(task_data)
+
+                    # Get phase as string
+                    phase = project.get('phase')
+                    phase_str = phase.value if hasattr(phase, 'value') else str(phase)
+
+                    project_data = {
+                        'id': project_id,
+                        'name': project.get('name', 'Unnamed Project'),
+                        'phase': phase_str,
+                        'roadmap': tasks,
+                        'progress': project.get('progress_score', 0),
+                        'is_collaborative': False,
+                        'created_at': project.get('created_at', 0),
+                        'updated_at': project.get('updated_at', 0)
+                    }
+                    projects.append(project_data)
+
+            # Get collaborative projects
+            if hasattr(self.orchestrator, 'collab') and self.orchestrator.collab:
+                collab = self.orchestrator.collab
+                for project_id, project in collab.projects.items():
+                    tasks = []
+                    for task in project.tasks:
+                        task_data = {
+                            'id': task.id,
+                            'name': task.name,
+                            'status': task.status.value if hasattr(task.status, 'value') else str(task.status),
+                            'priority': task.priority,
+                            'dependencies': task.depends_on,
+                            'progress': 1.0 if task.status.value in ['approved', 'completed'] else 0.5 if task.status.value == 'in_progress' else 0.0,
+                            'assigned_to': task.assigned_to
+                        }
+                        tasks.append(task_data)
+
+                    project_data = {
+                        'id': project_id,
+                        'name': project.name,
+                        'phase': 'active' if project.active else 'inactive',
+                        'roadmap': tasks,
+                        'progress': len([t for t in project.tasks if t.status.value in ['approved', 'completed']]) / max(len(project.tasks), 1),
+                        'is_collaborative': True,
+                        'created_at': project.created_at,
+                        'coordinator': project.coordinator
+                    }
+                    projects.append(project_data)
+
+            return web.json_response({
+                'success': True,
+                'projects': projects,
+                'total_projects': len(projects)
+            })
+
+        except Exception as e:
+            return web.json_response({
+                'success': False,
+                'error': str(e),
+                'projects': []
+            }, status=500)
+
+    def _normalize_task_status(self, task: dict, project: dict) -> str:
+        """Normalize task status for Gantt display."""
+        completed_tasks = project.get('completed_tasks', [])
+        current_task = project.get('current_subtask')
+
+        task_name = task.get('name', '')
+
+        # Check if task is completed
+        if task_name in completed_tasks or task.get('completed', False):
+            return 'completed'
+
+        # Check if task is current
+        if current_task and current_task.get('name') == task_name:
+            return 'in_progress'
+
+        # Check for explicit status
+        if 'status' in task:
+            return task['status']
+
+        return 'pending'
+
+    def _calculate_task_progress(self, task: dict, project: dict) -> float:
+        """Calculate task progress for visualization."""
+        completed_tasks = project.get('completed_tasks', [])
+        current_task = project.get('current_subtask')
+
+        task_name = task.get('name', '')
+
+        if task_name in completed_tasks or task.get('completed', False):
+            return 1.0
+
+        if current_task and current_task.get('name') == task_name:
+            return 0.5
+
+        return 0.0
+
     async def websocket_handler(self, request):
         """Handle WebSocket connections for real-time updates."""
         ws = web.WebSocketResponse()

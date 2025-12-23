@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synth Mind - Project Timeline & Gantt Charts</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e4e4e4;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            font-size: 2.2em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .nav-links {
+            margin-top: 15px;
+        }
+
+        .nav-links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        select, button {
+            padding: 10px 20px;
+            background: rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(102, 126, 234, 0.5);
+            border-radius: 8px;
+            color: #e4e4e4;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        select:hover, button:hover {
+            background: rgba(102, 126, 234, 0.4);
+        }
+
+        button.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .gantt-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 25px;
+            overflow-x: auto;
+        }
+
+        .project-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .project-title {
+            font-size: 1.4em;
+            color: #667eea;
+        }
+
+        .project-meta {
+            display: flex;
+            gap: 20px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .project-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .gantt-chart {
+            position: relative;
+            min-width: 800px;
+        }
+
+        .gantt-header {
+            display: flex;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+            margin-bottom: 10px;
+        }
+
+        .gantt-label-col {
+            width: 250px;
+            min-width: 250px;
+            padding: 10px;
+            font-weight: bold;
+            color: #aaa;
+        }
+
+        .gantt-timeline-col {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+
+        .timeline-marker {
+            flex: 1;
+            text-align: center;
+            padding: 10px 5px;
+            color: #888;
+            font-size: 0.85em;
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .gantt-row {
+            display: flex;
+            min-height: 50px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s ease;
+        }
+
+        .gantt-row:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .task-label {
+            width: 250px;
+            min-width: 250px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .task-icon {
+            font-size: 1.2em;
+        }
+
+        .task-name {
+            flex: 1;
+            font-size: 0.95em;
+        }
+
+        .task-priority {
+            font-size: 0.75em;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .priority-1 { background: rgba(239, 68, 68, 0.3); color: #ef4444; }
+        .priority-2 { background: rgba(251, 191, 36, 0.3); color: #fbbf24; }
+        .priority-3 { background: rgba(74, 222, 128, 0.3); color: #4ade80; }
+
+        .task-bar-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 5px 0;
+        }
+
+        .task-bar {
+            position: absolute;
+            height: 30px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .task-bar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        .task-bar.completed {
+            background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
+        }
+
+        .task-bar.in_progress, .task-bar.in-progress {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            animation: progress-pulse 2s infinite;
+        }
+
+        .task-bar.pending {
+            background: linear-gradient(90deg, #64748b 0%, #475569 100%);
+        }
+
+        .task-bar.blocked {
+            background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .task-bar.pending_review {
+            background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+        }
+
+        @keyframes progress-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .dependency-line {
+            position: absolute;
+            stroke: rgba(102, 126, 234, 0.5);
+            stroke-width: 2;
+            fill: none;
+            pointer-events: none;
+        }
+
+        .dependency-arrow {
+            fill: rgba(102, 126, 234, 0.5);
+        }
+
+        .task-tooltip {
+            position: fixed;
+            background: rgba(26, 26, 46, 0.95);
+            border: 1px solid rgba(102, 126, 234, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            max-width: 300px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .task-tooltip.visible {
+            display: block;
+        }
+
+        .tooltip-title {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+
+        .tooltip-row span:first-child {
+            color: #aaa;
+        }
+
+        .legend {
+            display: flex;
+            gap: 25px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-color.completed { background: linear-gradient(90deg, #4ade80, #22c55e); }
+        .legend-color.in-progress { background: linear-gradient(90deg, #667eea, #764ba2); }
+        .legend-color.pending { background: linear-gradient(90deg, #64748b, #475569); }
+        .legend-color.blocked { background: linear-gradient(90deg, #ef4444, #dc2626); }
+        .legend-color.pending-review { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+
+        .no-projects {
+            text-align: center;
+            padding: 60px;
+            color: #888;
+        }
+
+        .no-projects h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .summary-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .summary-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .summary-label {
+            color: #aaa;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 20px;
+            font-size: 0.85em;
+            color: #667eea;
+            display: none;
+        }
+
+        .refresh-indicator.active {
+            display: block;
+            animation: fade-in-out 1s ease;
+        }
+
+        @keyframes fade-in-out {
+            0% { opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .zoom-controls button {
+            padding: 8px 12px;
+            font-size: 0.8em;
+        }
+
+        .collab-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: rgba(118, 75, 162, 0.3);
+            color: #a78bfa;
+            border-radius: 10px;
+            font-size: 0.75em;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Project Timeline & Gantt Charts</h1>
+            <p class="subtitle">Visual project roadmap with task dependencies and progress tracking</p>
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                <a href="/timeline">Timeline</a>
+            </div>
+        </header>
+
+        <div class="summary-cards" id="summary-cards">
+            <div class="summary-card">
+                <div class="summary-value" id="total-projects">0</div>
+                <div class="summary-label">Total Projects</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="active-tasks">0</div>
+                <div class="summary-label">Active Tasks</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="completed-tasks">0</div>
+                <div class="summary-label">Completed Tasks</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="overall-progress">0%</div>
+                <div class="summary-label">Overall Progress</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Project:</label>
+                <select id="project-select" onchange="selectProject(this.value)">
+                    <option value="all">All Projects</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>View:</label>
+                <button class="active" onclick="setView('gantt', this)">Gantt</button>
+                <button onclick="setView('timeline', this)">Timeline</button>
+            </div>
+            <div class="control-group zoom-controls">
+                <label>Zoom:</label>
+                <button onclick="zoom('out')">-</button>
+                <button onclick="zoom('reset')">100%</button>
+                <button onclick="zoom('in')">+</button>
+            </div>
+            <button onclick="refreshData()" style="margin-left: auto;">Refresh</button>
+        </div>
+
+        <div id="gantt-area">
+            <div class="no-projects" id="no-projects">
+                <h2>No Active Projects</h2>
+                <p>Start a project with <code>/project [description]</code> or <code>/project template [id]</code></p>
+            </div>
+        </div>
+
+        <div class="refresh-indicator" id="refresh-indicator">Refreshing...</div>
+    </div>
+
+    <div class="task-tooltip" id="task-tooltip">
+        <div class="tooltip-title" id="tooltip-title">Task Name</div>
+        <div class="tooltip-row">
+            <span>Status:</span>
+            <span id="tooltip-status">--</span>
+        </div>
+        <div class="tooltip-row">
+            <span>Priority:</span>
+            <span id="tooltip-priority">--</span>
+        </div>
+        <div class="tooltip-row">
+            <span>Progress:</span>
+            <span id="tooltip-progress">--</span>
+        </div>
+        <div class="tooltip-row">
+            <span>Dependencies:</span>
+            <span id="tooltip-deps">None</span>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let projects = [];
+        let currentView = 'gantt';
+        let zoomLevel = 1;
+        let selectedProjectId = 'all';
+
+        // Fetch project data
+        async function fetchProjects() {
+            try {
+                const response = await fetch('/api/timeline');
+                const data = await response.json();
+                if (data.success) {
+                    projects = data.projects || [];
+                    updateProjectSelect();
+                    renderGanttCharts();
+                    updateSummary();
+                }
+            } catch (e) {
+                console.error('Failed to fetch projects:', e);
+            }
+        }
+
+        // Update project dropdown
+        function updateProjectSelect() {
+            const select = document.getElementById('project-select');
+            select.innerHTML = '<option value="all">All Projects</option>';
+            projects.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.name;
+                if (p.id === selectedProjectId) option.selected = true;
+                select.appendChild(option);
+            });
+        }
+
+        // Update summary cards
+        function updateSummary() {
+            let totalTasks = 0;
+            let completedTasks = 0;
+            let activeTasks = 0;
+
+            projects.forEach(p => {
+                const tasks = p.roadmap || [];
+                totalTasks += tasks.length;
+                tasks.forEach(t => {
+                    if (t.status === 'completed' || t.status === 'approved') completedTasks++;
+                    if (t.status === 'in_progress' || t.status === 'in-progress') activeTasks++;
+                });
+            });
+
+            document.getElementById('total-projects').textContent = projects.length;
+            document.getElementById('active-tasks').textContent = activeTasks;
+            document.getElementById('completed-tasks').textContent = completedTasks;
+            document.getElementById('overall-progress').textContent =
+                totalTasks > 0 ? `${Math.round(completedTasks / totalTasks * 100)}%` : '0%';
+        }
+
+        // Render Gantt charts
+        function renderGanttCharts() {
+            const area = document.getElementById('gantt-area');
+            const noProjects = document.getElementById('no-projects');
+
+            const filteredProjects = selectedProjectId === 'all'
+                ? projects
+                : projects.filter(p => p.id === selectedProjectId);
+
+            if (filteredProjects.length === 0) {
+                noProjects.style.display = 'block';
+                area.innerHTML = '';
+                area.appendChild(noProjects);
+                return;
+            }
+
+            noProjects.style.display = 'none';
+            area.innerHTML = '';
+
+            filteredProjects.forEach(project => {
+                const container = createGanttContainer(project);
+                area.appendChild(container);
+            });
+        }
+
+        // Create Gantt chart for a project
+        function createGanttContainer(project) {
+            const container = document.createElement('div');
+            container.className = 'gantt-container';
+
+            const tasks = project.roadmap || [];
+            const totalTasks = tasks.length;
+            const completedTasks = tasks.filter(t =>
+                t.status === 'completed' || t.status === 'approved'
+            ).length;
+            const progress = totalTasks > 0 ? Math.round(completedTasks / totalTasks * 100) : 0;
+
+            // Header
+            container.innerHTML = `
+                <div class="project-header">
+                    <div>
+                        <span class="project-title">${escapeHtml(project.name)}</span>
+                        ${project.is_collaborative ? '<span class="collab-badge">Collaborative</span>' : ''}
+                    </div>
+                    <div class="project-meta">
+                        <span>Phase: ${project.phase || '--'}</span>
+                        <span>Progress: ${progress}%</span>
+                        <span>Tasks: ${completedTasks}/${totalTasks}</span>
+                    </div>
+                </div>
+            `;
+
+            if (tasks.length === 0) {
+                container.innerHTML += `
+                    <div style="text-align: center; padding: 30px; color: #888;">
+                        No tasks defined yet. Project is in ${project.phase || 'initialization'} phase.
+                    </div>
+                `;
+                return container;
+            }
+
+            // Create Gantt chart
+            const chart = document.createElement('div');
+            chart.className = 'gantt-chart';
+            chart.style.transform = `scaleX(${zoomLevel})`;
+            chart.style.transformOrigin = 'left';
+
+            // Timeline header
+            const timelineSteps = 10;
+            let headerHtml = `
+                <div class="gantt-header">
+                    <div class="gantt-label-col">Task</div>
+                    <div class="gantt-timeline-col">
+            `;
+            for (let i = 0; i <= timelineSteps; i++) {
+                const label = i === 0 ? 'Start' : i === timelineSteps ? 'End' : `${i * 10}%`;
+                headerHtml += `<div class="timeline-marker">${label}</div>`;
+            }
+            headerHtml += '</div></div>';
+            chart.innerHTML = headerHtml;
+
+            // Render each task row
+            tasks.forEach((task, idx) => {
+                const row = createTaskRow(task, idx, tasks.length);
+                chart.appendChild(row);
+            });
+
+            container.appendChild(chart);
+
+            // Legend
+            const legend = document.createElement('div');
+            legend.className = 'legend';
+            legend.innerHTML = `
+                <div class="legend-item">
+                    <div class="legend-color completed"></div>
+                    <span>Completed</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color in-progress"></div>
+                    <span>In Progress</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color pending"></div>
+                    <span>Pending</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color pending-review"></div>
+                    <span>Pending Review</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color blocked"></div>
+                    <span>Blocked</span>
+                </div>
+            `;
+            container.appendChild(legend);
+
+            return container;
+        }
+
+        // Create a task row
+        function createTaskRow(task, index, totalTasks) {
+            const row = document.createElement('div');
+            row.className = 'gantt-row';
+
+            // Task label
+            const statusIcons = {
+                'completed': '✅',
+                'approved': '✅',
+                'in_progress': '🔄',
+                'in-progress': '🔄',
+                'pending': '⏳',
+                'blocked': '🚫',
+                'pending_review': '👀',
+                'available': '📋',
+                'claimed': '🎯'
+            };
+            const icon = statusIcons[task.status] || '📋';
+            const priority = task.priority || 3;
+
+            const labelHtml = `
+                <div class="task-label">
+                    <span class="task-icon">${icon}</span>
+                    <span class="task-name">${escapeHtml(task.name || `Task ${index + 1}`)}</span>
+                    <span class="task-priority priority-${Math.min(priority, 3)}">P${priority}</span>
+                </div>
+            `;
+
+            // Task bar
+            const barContainer = document.createElement('div');
+            barContainer.className = 'task-bar-container';
+
+            // Calculate bar position and width
+            // Distribute tasks evenly across timeline
+            const barWidth = Math.max(8, 90 / totalTasks);
+            const barStart = (index / totalTasks) * 90;
+            const barWidthAdjusted = task.status === 'completed' || task.status === 'approved'
+                ? barWidth
+                : barWidth * 0.8;
+
+            const bar = document.createElement('div');
+            bar.className = `task-bar ${task.status || 'pending'}`;
+            bar.style.left = `${barStart}%`;
+            bar.style.width = `${barWidthAdjusted}%`;
+            bar.textContent = task.status === 'in_progress' || task.status === 'in-progress'
+                ? '▶'
+                : task.status === 'completed' || task.status === 'approved' ? '✓' : '';
+
+            // Tooltip events
+            bar.addEventListener('mouseenter', (e) => showTooltip(e, task));
+            bar.addEventListener('mouseleave', hideTooltip);
+            bar.addEventListener('mousemove', moveTooltip);
+
+            barContainer.appendChild(bar);
+
+            row.innerHTML = labelHtml;
+            row.appendChild(barContainer);
+
+            return row;
+        }
+
+        // Tooltip functions
+        function showTooltip(event, task) {
+            const tooltip = document.getElementById('task-tooltip');
+            document.getElementById('tooltip-title').textContent = task.name || 'Unnamed Task';
+            document.getElementById('tooltip-status').textContent = formatStatus(task.status);
+            document.getElementById('tooltip-priority').textContent = `P${task.priority || 3}`;
+            document.getElementById('tooltip-progress').textContent = task.progress
+                ? `${Math.round(task.progress * 100)}%`
+                : '--';
+            document.getElementById('tooltip-deps').textContent =
+                task.dependencies && task.dependencies.length > 0
+                    ? task.dependencies.join(', ')
+                    : 'None';
+            tooltip.classList.add('visible');
+            moveTooltip(event);
+        }
+
+        function moveTooltip(event) {
+            const tooltip = document.getElementById('task-tooltip');
+            tooltip.style.left = `${event.clientX + 15}px`;
+            tooltip.style.top = `${event.clientY + 15}px`;
+        }
+
+        function hideTooltip() {
+            document.getElementById('task-tooltip').classList.remove('visible');
+        }
+
+        function formatStatus(status) {
+            const statusMap = {
+                'completed': 'Completed',
+                'approved': 'Approved',
+                'in_progress': 'In Progress',
+                'in-progress': 'In Progress',
+                'pending': 'Pending',
+                'blocked': 'Blocked',
+                'pending_review': 'Pending Review',
+                'available': 'Available',
+                'claimed': 'Claimed'
+            };
+            return statusMap[status] || status || 'Unknown';
+        }
+
+        // View controls
+        function selectProject(projectId) {
+            selectedProjectId = projectId;
+            renderGanttCharts();
+        }
+
+        function setView(view, btn) {
+            currentView = view;
+            document.querySelectorAll('.control-group button').forEach(b => {
+                if (b.textContent.toLowerCase() === view.toLowerCase() ||
+                    (view === 'gantt' && b.textContent === 'Gantt') ||
+                    (view === 'timeline' && b.textContent === 'Timeline')) {
+                    b.classList.add('active');
+                } else if (b.textContent === 'Gantt' || b.textContent === 'Timeline') {
+                    b.classList.remove('active');
+                }
+            });
+            renderGanttCharts();
+        }
+
+        function zoom(direction) {
+            if (direction === 'in') {
+                zoomLevel = Math.min(zoomLevel * 1.2, 2);
+            } else if (direction === 'out') {
+                zoomLevel = Math.max(zoomLevel / 1.2, 0.5);
+            } else {
+                zoomLevel = 1;
+            }
+            document.querySelectorAll('.gantt-chart').forEach(chart => {
+                chart.style.transform = `scaleX(${zoomLevel})`;
+            });
+        }
+
+        function refreshData() {
+            const indicator = document.getElementById('refresh-indicator');
+            indicator.classList.add('active');
+            fetchProjects().then(() => {
+                setTimeout(() => indicator.classList.remove('active'), 1000);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        fetchProjects();
+
+        // Auto-refresh every 10 seconds
+        setInterval(fetchProjects, 10000);
+    </script>
+</body>
+</html>
