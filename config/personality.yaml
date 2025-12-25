@@ -220,6 +220,63 @@ assurance:
   resolution_decay: 0.95
 
 # ============================================
+# MANDELBROT WORD WEIGHTING
+# ============================================
+# Frequency-aware word weighting using Mandelbrot-Zipf distribution.
+# Gives higher weight to rare, domain-specific words vs common words.
+#
+# This improves intent detection by emphasizing informative terms.
+# Example: "ephemeral" carries more signal than "the"
+
+mandelbrot_weighting:
+  # Enable/disable the Mandelbrot weighting system
+  enabled: true
+
+  # Alpha (α): Frequency decay exponent
+  # Range: 0.5 - 2.0
+  # - Lower (0.5): Flatter distribution, less difference between common/rare
+  # - Default (1.0): Standard Zipf-like decay
+  # - Higher (1.5-2.0): Steep decay, rare words heavily emphasized
+  alpha: 1.0
+
+  # Beta (β): Rank shift parameter
+  # Range: 1.0 - 10.0
+  # - Lower (1.0): Sharper distinction at top ranks
+  # - Default (2.5): Balanced smoothing
+  # - Higher (5.0+): Smoother distribution, less extreme weights
+  beta: 2.5
+
+  # Weight bounds
+  min_weight: 0.1               # Floor for common/stopwords
+  max_weight: 5.0               # Ceiling for rare/domain terms
+
+  # Domain-specific word boosts (multipliers)
+  # These words get additional weight beyond frequency-based scoring
+  domain_boosts:
+    # Intent-signaling words
+    ephemeral: 2.0
+    schedule: 1.8
+    backup: 1.5
+    delete: 1.5
+    storage: 1.4
+    project: 1.4
+    remind: 1.6
+    urgent: 1.8
+    critical: 1.7
+    temporary: 1.5
+    # Action words
+    create: 1.3
+    update: 1.3
+    remove: 1.4
+    configure: 1.5
+    deploy: 1.6
+    # Technical terms
+    api: 1.4
+    database: 1.4
+    server: 1.3
+    webhook: 1.5
+
+# ============================================
 # META-REFLECTION
 # ============================================
 # Settings for self-reflection and introspection.
