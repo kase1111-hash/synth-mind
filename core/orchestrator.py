@@ -5,7 +5,9 @@ Core Orchestrator - Main conversation loop with all psychological modules.
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
+
+import yaml
 
 from core.llm_wrapper import LLMWrapper
 from core.memory import MemorySystem
@@ -46,29 +48,50 @@ class SynthOrchestrator:
         self.gdil: Optional[GoalDirectedIterationLoop] = None
         self.collab: Optional[CollaborativeProjectManager] = None
 
+        # Configuration
+        self.personality_config: Dict = {}
+
         # State
         self.context = []
         self.turn_count = 0
         self.running = False
     
+    def _load_personality_config(self) -> Dict:
+        """Load personality configuration from YAML."""
+        config_file = self.config_path / "personality.yaml"
+        if config_file.exists():
+            try:
+                with open(config_file, 'r') as f:
+                    return yaml.safe_load(f) or {}
+            except Exception as e:
+                print(f"⚠️  Failed to load personality.yaml: {e}")
+        return {}
+
     async def initialize(self):
         """Load configuration and initialize all modules."""
+        # Load personality configuration
+        self.personality_config = self._load_personality_config()
+
         # Initialize core
         self.llm = LLMWrapper()
         self.memory = MemorySystem()
         await self.memory.initialize()
-        
+
         self.tools = ToolManager()
         self.emotion = EmotionRegulator()
         self.metrics = MetricsTracker()
-        
+
         # Initialize psychological modules
         self.dreaming = PredictiveDreamingModule(
             self.llm, self.memory, self.emotion
         )
-        
+
+        # Get Mandelbrot weighting config for AssuranceResolutionModule
+        mandelbrot_config = self.personality_config.get("mandelbrot_weighting", {})
+
         self.assurance = AssuranceResolutionModule(
-            self.llm, self.memory, self.emotion
+            self.llm, self.memory, self.emotion,
+            mandelbrot_config=mandelbrot_config
         )
         
         self.temporal = TemporalPurposeEngine(
