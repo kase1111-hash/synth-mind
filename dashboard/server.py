@@ -174,6 +174,9 @@ class DashboardServer:
         self.app.router.add_post('/api/federated/receive', self.federated_receive)
         self.app.router.add_get('/api/federated/stats', self.federated_stats)
 
+        # Chat API - process messages through full cognitive pipeline
+        self.app.router.add_post('/api/chat', self.chat_handler)
+
         # Collaborative Projects API
         self.app.router.add_get('/api/collab/projects', self.collab_projects)
         self.app.router.add_post('/api/collab/sync', self.collab_sync)
@@ -467,6 +470,51 @@ class DashboardServer:
             return web.json_response({
                 "response": response_text.strip(),
                 "success": True
+            })
+
+        except Exception as e:
+            return web.json_response(
+                {"error": str(e), "success": False},
+                status=500
+            )
+
+    async def chat_handler(self, request):
+        """
+        Process a chat message through the full cognitive pipeline.
+        This runs dreaming, assurance, meta-reflection, and all psychological modules.
+        """
+        try:
+            data = await request.json()
+            message = data.get('message', '')
+
+            if not message:
+                return web.json_response(
+                    {"error": "No message provided", "success": False},
+                    status=400
+                )
+
+            # Process through full pipeline (dreaming, assurance, reflection, etc.)
+            await self.orchestrator._process_turn(message)
+
+            # Get the response (last assistant message in context)
+            response = self.orchestrator.context[-1]["content"]
+
+            # Gather current state
+            emotion_state = self.orchestrator.emotion.current_state()
+
+            # Broadcast state update to any connected dashboards
+            await self.broadcast_state()
+
+            return web.json_response({
+                "success": True,
+                "response": response,
+                "state": {
+                    "valence": emotion_state["valence"],
+                    "mood_tags": emotion_state["tags"],
+                    "turn_count": self.orchestrator.turn_count,
+                    "dream_alignment": self.orchestrator.metrics.last_dream_alignment,
+                    "flow_state": "flow" if 0.4 <= self.orchestrator.calibration.difficulty_moving_avg <= 0.7 else "bored" if self.orchestrator.calibration.difficulty_moving_avg < 0.4 else "overloaded"
+                }
             })
 
         except Exception as e:
