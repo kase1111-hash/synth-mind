@@ -1,1 +1,45 @@
-
+# Peer Endpoints Configuration
+# =============================
+#
+# This file configures the Social Companionship Layer for peer-to-peer communication
+# between synth-mind instances. When idle, your instance can exchange abstract insights
+# with configured peers for collaborative learning.
+#
+# IMPORTANT: No user data is ever shared - only abstract topics and cognitive patterns.
+#
+# Format:
+#   - One URL per line
+#   - Each URL should point to the /api/generate endpoint
+#   - Comments start with #
+#   - Empty lines are ignored
+#
+# Getting Started:
+# ----------------
+# 1. Deploy multiple synth-mind instances
+# 2. Uncomment and configure the peer URLs below
+# 3. Restart the orchestrator to apply changes
+#
+# Example - Local Development (multiple instances on different ports):
+# http://localhost:8081/api/generate
+# http://localhost:8082/api/generate
+# http://localhost:8083/api/generate
+#
+# Example - Production Network:
+# https://synth-peer-1.mycompany.internal:8443/api/generate
+# https://synth-peer-2.mycompany.internal:8443/api/generate
+#
+# Example - Docker Compose (service names):
+# http://synth-peer-1:8080/api/generate
+# http://synth-peer-2:8080/api/generate
+#
+# Security Notes:
+# ---------------
+# - Use HTTPS in production environments
+# - Configure IP firewall rules in personality.yaml
+# - Peers should be within trusted network boundaries
+# - Rate limiting is applied to peer communications
+#
+# To enable social companionship, uncomment at least one peer URL below:
+#
+# http://localhost:8081/api/generate
+# http://localhost:8082/api/generate
