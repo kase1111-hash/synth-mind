@@ -165,20 +165,20 @@ class SynthOrchestrator:
         # Check if we're in active project mode
         if self.gdil.active_project:
             phase = self.gdil.active_project["phase"]
-            
+
             if phase.value == "initialization":
                 # Process clarification
-                response = self.gdil.process_clarification(user_input)
+                response = await self.gdil.process_clarification(user_input)
                 print(f"\n🔮 Synth: {response}\n")
                 return
             elif phase.value == "planning":
                 # User confirming roadmap
-                response = self.gdil.start_iteration(user_input)
+                response = await self.gdil.start_iteration(user_input)
                 print(f"\n🔮 Synth: {response}\n")
                 return
             elif phase.value == "iteration":
                 # Continue iteration
-                response = self.gdil.continue_iteration(user_input)
+                response = await self.gdil.continue_iteration(user_input)
                 print(f"\n🔮 Synth: {response}\n")
                 return
         
@@ -217,7 +217,7 @@ class SynthOrchestrator:
             final_response = draft_response
         
         # 6. Check for meta-reflection trigger
-        reflection_result = self.reflection.run_cycle(
+        reflection_result = await self.reflection.run_cycle(
             context_str,
             self.emotion.current_state(),
             self._gather_metrics()
@@ -238,7 +238,7 @@ class SynthOrchestrator:
         self.memory.store_turn(user_input, final_response)
         
         # 10. Dream ahead for next turn
-        self.dreaming.dream_next_turn(self._format_context())
+        await self.dreaming.dream_next_turn(self._format_context())
         
         # 11. Update metrics
         self.metrics.update_turn_metrics(
@@ -299,7 +299,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         if cmd == "/state":
             self._print_state()
         elif cmd == "/reflect":
-            result = self.reflection.run_cycle(
+            result = await self.reflection.run_cycle(
                 self._format_context(),
                 self.emotion.current_state(),
                 self._gather_metrics()
@@ -351,7 +351,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         elif cmd.startswith("/project "):
             # Start new project
             description = command[9:].strip()
-            response = self.gdil.start_project(description)
+            response = await self.gdil.start_project(description)
             print(f"\n🎯 {response}\n")
         elif cmd == "/project status":
             status = self.gdil.get_project_status()

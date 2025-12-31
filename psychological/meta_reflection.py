@@ -87,7 +87,7 @@ Output JSON:
 """
         return prompt
     
-    def perform_reflection(
+    async def perform_reflection(
         self, context_summary: str, emotional_state: Dict, metrics: Dict
     ) -> Optional[Dict]:
         """Execute full reflection cycle."""
@@ -95,8 +95,8 @@ Output JSON:
             prompt = self.generate_reflection_prompt(
                 context_summary, emotional_state, metrics
             )
-            
-            raw_reflection = self.llm.generate(
+
+            raw_reflection = await self.llm.generate(
                 prompt,
                 temperature=0.7,
                 max_tokens=1024
@@ -160,7 +160,7 @@ Output JSON:
             "overall_insight": "Operating within normal parameters"
         }
     
-    def run_cycle(
+    async def run_cycle(
         self, context: str, emotional_state: Dict, performance_metrics: Dict
     ) -> Optional[Dict]:
         """
@@ -169,12 +169,12 @@ Output JSON:
         """
         if not self.should_reflect():
             return None
-        
+
         # Summarize recent context
         recent_context = context[-2000:] if len(context) > 2000 else context
-        
-        reflection_result = self.perform_reflection(
+
+        reflection_result = await self.perform_reflection(
             recent_context, emotional_state, performance_metrics
         )
-        
+
         return reflection_result

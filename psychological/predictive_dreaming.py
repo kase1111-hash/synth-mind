@@ -25,7 +25,7 @@ class PredictiveDreamingModule:
         self.dream_buffer = []
         self.alignment_history = []
     
-    def dream_next_turn(self, current_context: str, n_dreams: int = 5):
+    async def dream_next_turn(self, current_context: str, n_dreams: int = 5):
         """
         Generate plausible next user inputs via self-simulation.
         Runs after generating a response.
@@ -40,9 +40,9 @@ Conversation:
 Output JSON list: [{{"text": str, "probability": float}}]
 Keep probabilities normalized (sum ≈ 1.0).
 """
-        
+
         try:
-            dreams_raw = self.llm.generate(prompt, temperature=0.9, max_tokens=512)
+            dreams_raw = await self.llm.generate(prompt, temperature=0.9, max_tokens=512)
             dreams = self._parse_dreams(dreams_raw, n_dreams)
             
             for dream in dreams:
