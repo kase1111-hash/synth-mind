@@ -119,7 +119,7 @@ class GoalDirectedIterationLoop:
         """Persist all projects to memory."""
         self.memory.store_persistent("gdil_projects", self.projects)
     
-    def start_project(self, user_input: str, project_name: Optional[str] = None) -> str:
+    async def start_project(self, user_input: str, project_name: Optional[str] = None) -> str:
         """
         Initialize a new project from user description.
         Phase 1: Clarify scope and goal.
@@ -178,7 +178,7 @@ class GoalDirectedIterationLoop:
         self.emotion.apply_reward_signal(valence=0.5, label="project_start", intensity=0.6)
 
         # Generate clarification questions using Predictive Dreaming
-        clarification = self._generate_clarification_questions(user_input)
+        clarification = await self._generate_clarification_questions(user_input)
 
         # Store in memory
         self.memory.store_episodic(
@@ -189,7 +189,7 @@ class GoalDirectedIterationLoop:
 
         return clarification
     
-    def _generate_clarification_questions(self, user_input: str) -> str:
+    async def _generate_clarification_questions(self, user_input: str) -> str:
         """Use Predictive Dreaming to identify ambiguities."""
         prompt = f"""
 You're starting a project with this description:
@@ -212,7 +212,7 @@ Output format:
 """
         
         try:
-            response = self.llm.generate(prompt, temperature=0.7, max_tokens=800)
+            response = await self.llm.generate(prompt, temperature=0.7, max_tokens=800)
             parsed = self._parse_json_response(response)
             
             # Store uncertainties for Assurance module
@@ -244,25 +244,25 @@ Output format:
                 f"3. What aspects matter most to you?"
             )
     
-    def process_clarification(self, user_response: str) -> str:
+    async def process_clarification(self, user_response: str) -> str:
         """
         Process user's clarification responses.
         Transition to Planning phase.
         """
         if not self.active_project or self.active_project["phase"] != ProjectPhase.INITIALIZATION:
             return "No active project initialization. Start with /project [description]"
-        
+
         # Store clarification
         self.active_project["clarification_response"] = user_response
         self.active_project["phase"] = ProjectPhase.PLANNING
         self.active_project["updated_at"] = time.time()
-        
+
         # Resolve assurance concerns
         for concern in self.assurance.pending_concerns[:]:
             self.assurance.seek_resolution(concern, user_response)
-        
+
         # Generate project brief and roadmap
-        brief_and_roadmap = self._generate_roadmap(
+        brief_and_roadmap = await self._generate_roadmap(
             self.active_project["initial_input"],
             user_response
         )
@@ -282,7 +282,7 @@ Output format:
         
         return brief_and_roadmap["presentation"]
     
-    def _generate_roadmap(self, initial_input: str, clarification: str) -> Dict:
+    async def _generate_roadmap(self, initial_input: str, clarification: str) -> Dict:
         """Generate project brief and decomposed roadmap."""
         prompt = f"""
 Based on the project description and clarifications, create a structured plan.
@@ -307,9 +307,9 @@ Output JSON:
   "confirmation_question": "..."
 }}
 """
-        
+
         try:
-            response = self.llm.generate(prompt, temperature=0.6, max_tokens=1200)
+            response = await self.llm.generate(prompt, temperature=0.6, max_tokens=1200)
             parsed = self._parse_json_response(response)
             
             # Format presentation
@@ -333,25 +333,25 @@ Output JSON:
                 "presentation": "I've outlined a basic plan. Should we proceed?"
             }
     
-    def start_iteration(self, user_confirmation: str) -> str:
+    async def start_iteration(self, user_confirmation: str) -> str:
         """
         Begin iteration phase.
         Execute first subtask.
         """
         if not self.active_project or self.active_project["phase"] != ProjectPhase.PLANNING:
             return "Project not in planning phase"
-        
+
         # Check confirmation
         if "no" in user_confirmation.lower() or "wait" in user_confirmation.lower():
             return "Understood. What adjustments should we make to the roadmap?"
-        
+
         self.active_project["phase"] = ProjectPhase.ITERATION
         self.active_project["iteration_count"] = 0
         self.active_project["low_progress_count"] = 0
-        
+
         # Select first subtask
         next_task = self._select_next_subtask()
-        return self._execute_subtask(next_task)
+        return await self._execute_subtask(next_task)
     
     def _select_next_subtask(self) -> Dict:
         """
@@ -375,21 +375,21 @@ Output JSON:
         
         return None
     
-    def _execute_subtask(self, task: Dict) -> str:
+    async def _execute_subtask(self, task: Dict) -> str:
         """
         Execute a subtask, asking questions as needed.
         Phase 3: Iteration cycle.
         """
         if task is None:
             return self._initiate_exit("All subtasks completed!")
-        
+
         self.active_project["current_subtask"] = task
         self.active_project["iteration_count"] += 1
-        
+
         # Check max iterations
         if self.active_project["iteration_count"] > self.max_iterations:
             return self._initiate_exit("Maximum iterations reached")
-        
+
         # Generate execution with questions
         prompt = f"""
 You're working on this subtask of a project:
@@ -410,9 +410,9 @@ Output JSON:
   "blockers": ["..."]  // Empty if none
 }}
 """
-        
+
         try:
-            response = self.llm.generate(prompt, temperature=0.7, max_tokens=2000)
+            response = await self.llm.generate(prompt, temperature=0.7, max_tokens=2000)
             parsed = self._parse_json_response(response)
             
             # Store iteration
@@ -496,25 +496,25 @@ Output JSON:
         except Exception as e:
             return f"Error executing subtask: {e}\nWhat should we do?"
     
-    def continue_iteration(self, user_feedback: str) -> str:
+    async def continue_iteration(self, user_feedback: str) -> str:
         """
         Process user feedback and continue iteration.
         """
         if not self.active_project or self.active_project["phase"] != ProjectPhase.ITERATION:
             return "No active iteration"
-        
+
         # Check if user wants to stop
         stop_signals = ["stop", "pause", "enough", "done"]
         if any(signal in user_feedback.lower() for signal in stop_signals):
             return self._initiate_exit("User requested pause")
-        
+
         # Process feedback and continue
         current_task = self.active_project.get("current_subtask")
         if current_task:
-            return self._execute_subtask(current_task)
+            return await self._execute_subtask(current_task)
         else:
             next_task = self._select_next_subtask()
-            return self._execute_subtask(next_task)
+            return await self._execute_subtask(next_task)
     
     def _calculate_overall_progress(self) -> float:
         """Calculate overall project progress."""

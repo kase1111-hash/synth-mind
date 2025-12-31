@@ -21,6 +21,7 @@ pyyaml>=6.0
 python-dotenv>=1.0.0
 rich>=13.0.0  # For beautiful terminal output
 apscheduler>=3.10.0  # For background tasks
+PyJWT>=2.8.0  # For JWT authentication
 
 # Optional: Local LLM support
 # ollama>=0.1.0  # Uncomment if using Ollama
