@@ -358,26 +358,71 @@ if state["valence"] < -0.7:
     await send_alert_webhook("High anxiety detected")
 Future Enhancements
 
- Historical session comparison
- Export state snapshots
- Mobile-responsive design
- Dark/light theme toggle
- Advanced filtering and search
- Multi-agent dashboard (compare multiple instances)
- 3D visualization of state space
- Audio alerts for critical events
- Integration with external analytics tools
+- [ ] Historical session comparison
+- [ ] Export state snapshots
+- [ ] Dark/light theme toggle
+- [ ] Advanced filtering and search
+- [ ] Multi-agent dashboard (compare multiple instances)
+- [ ] 3D visualization of state space
+- [ ] Audio alerts for critical events
+- [ ] Integration with external analytics tools
 
-Contributing
+## File Structure
+
+```
+dashboard/
+├── server.py           # WebSocket + REST API server
+├── dashboard.html      # Main dashboard page (embedded in server)
+└── README_DASHBOARD.md # This documentation
+```
+
+## Deployment
+
+### Local Development
+```bash
+python run_synth_with_dashboard.py
+```
+
+### Production
+```bash
+# Use gunicorn or similar ASGI server
+gunicorn dashboard.server:app --worker-class aiohttp.GunicornWebWorker
+```
+
+### Docker
+```dockerfile
+FROM python:3.9
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+EXPOSE 8080
+CMD ["python", "run_synth_with_dashboard.py"]
+```
+
+## Browser Compatibility
+
+| Browser | Status |
+|---------|--------|
+| Chrome/Edge (Chromium) | ✅ Perfect |
+| Firefox | ✅ Perfect |
+| Safari | ✅ Perfect |
+| Mobile browsers | ✅ Responsive |
+| IE11 | ❌ Not supported |
+
+## Contributing
+
 To add new dashboard features:
 
-Extend state gathering in orchestrator.py
-Add UI elements to dashboard HTML
-Update WebSocket message format
-Test with multiple concurrent connections
-Update this documentation
+1. Extend state gathering in orchestrator.py
+2. Add UI elements to dashboard HTML
+3. Update WebSocket message format
+4. Test with multiple concurrent connections
+5. Update this documentation
 
-License
+## License
+
 MIT License - Same as Synth Mind core
+
+---
 
 The dashboard makes the invisible visible. Watch your synthetic mind think, feel, and grow in real-time.

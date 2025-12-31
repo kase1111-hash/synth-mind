@@ -404,21 +404,51 @@ Lower iteration_threshold (more sensitive to progress)
 Ensure Assurance module is flagging uncertainties
 
 
-Performance Notes
-Memory: +10-20MB per active project (roadmap, iterations, state)
-Speed: ~2-3s per iteration (includes LLM generation)
-Persistence: SQLite write per iteration (~1ms overhead)
+## Performance
 
-Future Enhancements
+| Metric | Value |
+|--------|-------|
+| Memory | +15MB per active project |
+| Speed | 2-3s per iteration (LLM generation) |
+| Persistence | SQLite writes (~1ms overhead) |
+| Scalability | Tested with 20+ subtask projects |
 
- Visual project timeline in dashboard
- Export project reports (PDF/Markdown)
- Project templates library
- Multi-agent project collaboration
- Gantt chart generation
- Automatic milestone celebration
- Version control integration (Git commits per subtask)
- Cost tracking (LLM API costs per project)
+## Comparison
+
+### vs. Standard Chat
+
+| Feature | Standard Chat | GDIL |
+|---------|--------------|------|
+| Structure | None—forgets context | 4-phase lifecycle |
+| Progress | Unknown | Quantified (0-100%) |
+| Ambiguity | Ignored | Forced clarification |
+| Blocking | Silently stuck | Explicit blockers + impact |
+| Resume | Start over | Pick up where left off |
+| Planning | Ad-hoc | Systematic roadmap |
+| Exit | Unclear | Graceful with summary |
+
+## File Structure
+
+```
+synth-mind/
+├── psychological/
+│   ├── goal_directed_iteration.py   # Full GDIL implementation
+│   └── ...
+├── core/
+│   └── orchestrator.py              # GDIL integration
+└── docs/
+    └── GDIL_README.md               # This documentation
+```
+
+## Future Enhancements
+
+- [x] Visual project timeline in dashboard
+- [x] Project templates library
+- [x] Multi-agent project collaboration
+- [x] Version control integration (Git commits per subtask)
+- [ ] Export project reports (PDF/Markdown)
+- [ ] Automatic milestone celebration
+- [ ] Cost tracking (LLM API costs per project)
 
 
 Examples

@@ -199,8 +199,7 @@ print("TEST 8: Documentation Files")
 print("=" * 60)
 
 docs = {
-    "GDIL_README.md": Path("GDIL_README.md"),
-    "GDIL_COMPLETE.md": Path("GDIL_COMPLETE.md"),
+    "GDIL_README.md": Path("docs/GDIL_README.md"),
 }
 
 for doc_name, doc_path in docs.items():
