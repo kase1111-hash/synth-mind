@@ -1,0 +1,16 @@
+apiVersion: v2
+name: synth-mind
+description: A Helm chart for Synth Mind - Psychologically Grounded AI Agent
+type: application
+version: 1.0.0
+appVersion: "1.7.0"
+keywords:
+  - ai
+  - agent
+  - llm
+  - cognitive
+maintainers:
+  - name: Synth Mind Team
+home: https://github.com/synth-mind/synth-mind
+sources:
+  - https://github.com/synth-mind/synth-mind
