@@ -63,7 +63,7 @@ class SecurityEvent:
     # Source information
     source_product: str = "synth-mind"
     source_host: str = field(default_factory=socket.gethostname)
-    source_version: str = "1.7.0"
+    source_version: str = "0.1.0-alpha"
 
     # Event metadata
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

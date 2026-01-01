@@ -12,7 +12,7 @@ info:
     - Federated learning
     - Authentication and user management
     - System health checks
-  version: 1.7.0
+  version: 0.1.0-alpha
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT

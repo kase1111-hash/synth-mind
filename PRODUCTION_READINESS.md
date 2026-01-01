@@ -1,7 +1,8 @@
 # Production Readiness Report
 
+> **Version:** 0.1.0-alpha
 > **Date:** 2026-01-01
-> **Status:** Production Ready
+> **Status:** Production Ready (Alpha)
 > **Completion:** 100%
 
 ---

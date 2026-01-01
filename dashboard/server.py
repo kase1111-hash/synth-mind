@@ -946,7 +946,7 @@ class DashboardServer:
             response = {
                 "status": "healthy" if all_healthy else "unhealthy",
                 "timestamp": datetime.now().isoformat(),
-                "version": "1.7",
+                "version": "0.1.0-alpha",
                 "checks": checks,
                 "websocket_connections": len(self.websockets),
             }
