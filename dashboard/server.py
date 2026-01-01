@@ -30,6 +30,7 @@ from utils.auth import AuthManager, UserRole
 from utils.rate_limiter import RateLimiter, RateLimitConfig, create_rate_limit_middleware
 from utils.access_logger import AccessLogger, AccessLogConfig, LogFormat, create_access_log_middleware
 from utils.ip_firewall import IPFirewall, FirewallConfig, FirewallMode, create_firewall_middleware
+from utils.prometheus_metrics import get_metrics
 
 class DashboardServer:
     """WebSocket server for streaming internal state to dashboard."""
@@ -42,6 +43,7 @@ class DashboardServer:
         '/health',
         '/health/live',
         '/health/ready',
+        '/metrics',
         '/api/auth/login',
         '/api/auth/setup',
         '/api/auth/status',
@@ -222,6 +224,9 @@ class DashboardServer:
         self.app.router.add_get('/health', self.health_check)
         self.app.router.add_get('/health/live', self.health_live)
         self.app.router.add_get('/health/ready', self.health_ready)
+
+        # Prometheus metrics endpoint
+        self.app.router.add_get('/metrics', self.prometheus_metrics)
 
         # Enable CORS with restricted origins (security fix)
         # Only allow localhost by default - configure allowed_origins for production
@@ -959,6 +964,33 @@ class DashboardServer:
             return web.json_response(
                 {"status": "not_ready", "error": str(e)},
                 status=503
+            )
+
+    async def prometheus_metrics(self, request):
+        """
+        Prometheus metrics endpoint.
+        Returns metrics in Prometheus exposition format for scraping.
+        """
+        try:
+            metrics = get_metrics()
+
+            # Update metrics from orchestrator state
+            metrics.update_from_orchestrator(self.orchestrator)
+
+            # Update WebSocket connections
+            metrics.websocket_connections.set(len(self.websockets))
+
+            # Format and return
+            output = metrics.format_prometheus()
+            return web.Response(
+                text=output,
+                content_type='text/plain; version=0.0.4; charset=utf-8'
+            )
+        except Exception as e:
+            return web.Response(
+                text=f"# Error collecting metrics: {e}\n",
+                content_type='text/plain',
+                status=500
             )
 
     # =========================================================================
