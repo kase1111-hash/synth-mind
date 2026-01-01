@@ -1,0 +1,87 @@
+# Synth Mind - Docker Compose Configuration
+# For local development and testing
+#
+# Usage:
+#   docker-compose up              # Start single instance
+#   docker-compose up --scale synth=3  # Start cluster of 3
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up  # Production mode
+
+version: '3.8'
+
+services:
+  synth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: synth-mind
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      # LLM Provider (uncomment one)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+      # - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      # - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+
+      # Application settings
+      - PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FILE=/app/state/synth.log
+
+      # Psychological module settings
+      - REFLECTION_INTERVAL=${REFLECTION_INTERVAL:-10}
+      - FLOW_TARGET_MIN=${FLOW_TARGET_MIN:-0.4}
+      - FLOW_TARGET_MAX=${FLOW_TARGET_MAX:-0.7}
+
+      # Memory settings
+      - MAX_CONTEXT_LENGTH=${MAX_CONTEXT_LENGTH:-8192}
+      - MEMORY_CONSOLIDATION_HOURS=${MEMORY_CONSOLIDATION_HOURS:-4}
+    volumes:
+      # Persist state (memory, embeddings, logs)
+      - synth-state:/app/state
+      # SSL certificates (optional)
+      - synth-certs:/app/certs
+      # Config files (optional - for personality.yaml, peers.txt)
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - synth-network
+
+  # Optional: Ollama for local LLM (uncomment to use)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: synth-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-models:/root/.ollama
+  #   networks:
+  #     - synth-network
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+
+volumes:
+  synth-state:
+    driver: local
+  synth-certs:
+    driver: local
+  # ollama-models:
+  #   driver: local
+
+networks:
+  synth-network:
+    driver: bridge
