@@ -414,12 +414,49 @@ Lower iteration_threshold (more sensitive to progress)
 Ensure Assurance module is flagging uncertainties
 
 
-Performance Notes
-Memory: +10-20MB per active project (roadmap, iterations, state)
-Speed: ~2-3s per iteration (includes LLM generation)
-Persistence: SQLite write per iteration (~1ms overhead)
+## Performance
 
-Future Enhancements
+| Metric | Value |
+|--------|-------|
+| Memory | +15MB per active project |
+| Speed | 2-3s per iteration (LLM generation) |
+| Persistence | SQLite writes (~1ms overhead) |
+| Scalability | Tested with 20+ subtask projects |
+
+## Comparison
+
+### vs. Standard Chat
+
+| Feature | Standard Chat | GDIL |
+|---------|--------------|------|
+| Structure | None—forgets context | 4-phase lifecycle |
+| Progress | Unknown | Quantified (0-100%) |
+| Ambiguity | Ignored | Forced clarification |
+| Blocking | Silently stuck | Explicit blockers + impact |
+| Resume | Start over | Pick up where left off |
+| Planning | Ad-hoc | Systematic roadmap |
+| Exit | Unclear | Graceful with summary |
+
+## File Structure
+
+```
+synth-mind/
+├── psychological/
+│   ├── goal_directed_iteration.py   # Full GDIL implementation
+│   ├── project_templates.py         # Project templates library
+│   ├── collaborative_projects.py    # Multi-agent collaboration
+│   └── ...
+├── core/
+│   └── orchestrator.py              # GDIL integration
+├── dashboard/
+│   └── timeline.html                # Gantt chart generation
+├── utils/
+│   └── version_control.py           # Version control integration
+└── docs/
+    └── GDIL_README.md               # This documentation
+```
+
+## Future Enhancements
 
 - [x] Visual project timeline in dashboard (`/timeline` route)
 - [x] Project templates library (`psychological/project_templates.py`)
