@@ -33,7 +33,6 @@ dashboard_files = {
     "dashboard.html": Path("dashboard/dashboard.html"),
     "timeline.html": Path("dashboard/timeline.html"),
     "README_DASHBOARD.md": Path("dashboard/README_DASHBOARD.md"),
-    "DASHBOARD_COMPLETE.md": Path("dashboard/DASHBOARD_COMPLETE.md"),
 }
 
 for name, path in dashboard_files.items():

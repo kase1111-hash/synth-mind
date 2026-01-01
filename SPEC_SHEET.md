@@ -956,8 +956,7 @@ synth-mind/
 │   ├── server.py                   # WebSocket server
 │   ├── dashboard.html              # Main dashboard page
 │   ├── timeline.html               # Gantt chart visualization
-│   ├── README_DASHBOARD.md         # Dashboard docs
-│   └── DASHBOARD_COMPLETE.md       # Dashboard spec
+│   └── README_DASHBOARD.md         # Dashboard documentation
 │
 ├── examples/
 │   └── simple_chat.py              # Demo script
@@ -981,10 +980,8 @@ synth-mind/
 └── docs/
     ├── QUICKSTART.md               # 5-minute setup guide
     ├── system-arch.md              # High-level architecture
-    ├── GDIL_README.md              # GDIL user guide
-    ├── GDIL_COMPLETE.md            # GDIL specification
+    ├── GDIL_README.md              # GDIL complete documentation
     ├── PEER_SETUP.md               # Multi-instance guide
-    ├── Query-Rating.md             # Self-healing design
     └── Repository-Structure.md     # File organization
 ```
 
@@ -1476,8 +1473,6 @@ MIT License — see [LICENSE](LICENSE) file
 - [README.md](README.md) — Main documentation
 - [QUICKSTART.md](docs/QUICKSTART.md) — 5-minute setup guide
 - [system-arch.md](docs/system-arch.md) — High-level architecture
-- [GDIL_README.md](docs/GDIL_README.md) — GDIL complete guide
-- [GDIL_COMPLETE.md](docs/GDIL_COMPLETE.md) — GDIL specification
+- [GDIL_README.md](docs/GDIL_README.md) — GDIL complete documentation
 - [PEER_SETUP.md](docs/PEER_SETUP.md) — Multi-instance configuration
-- [Query-Rating.md](docs/Query-Rating.md) — Self-healing design
 - [dashboard/README_DASHBOARD.md](dashboard/README_DASHBOARD.md) — Dashboard features
