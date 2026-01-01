@@ -371,15 +371,25 @@ Reopen days later
 /resume project → picks up exactly where you left off
 
 Parallel Projects
-(Future enhancement)
+Manage multiple concurrent projects:
+```bash
 /project list           # Show all projects
 /project switch [id]    # Switch active project
+```
+
 Project Templates
-(Future enhancement)
+Start from pre-built templates (10 available):
+```bash
 /project from template web-app-fullstack
+/project from template cli-tool
+/project from template data-pipeline
+```
+See `psychological/project_templates.py` for the full template library.
+
 Collaborative Projects
-(Future enhancement - with Social Companionship)
-Share project state with peer Synth instances for review
+Share project state with peer Synth instances for review.
+Uses the Social Companionship layer for secure multi-agent collaboration.
+See `psychological/collaborative_projects.py` for implementation details.
 
 Troubleshooting
 "Progress has stalled" exits too early
@@ -411,14 +421,14 @@ Persistence: SQLite write per iteration (~1ms overhead)
 
 Future Enhancements
 
- Visual project timeline in dashboard
- Export project reports (PDF/Markdown)
- Project templates library
- Multi-agent project collaboration
- Gantt chart generation
- Automatic milestone celebration
- Version control integration (Git commits per subtask)
- Cost tracking (LLM API costs per project)
+- [x] Visual project timeline in dashboard (`/timeline` route)
+- [x] Project templates library (`psychological/project_templates.py`)
+- [x] Multi-agent project collaboration (`psychological/collaborative_projects.py`)
+- [x] Gantt chart generation (`dashboard/timeline.html`)
+- [x] Version control integration (`utils/version_control.py`)
+- [ ] Export project reports (PDF/Markdown)
+- [ ] Automatic milestone celebration
+- [ ] Cost tracking (LLM API costs per project)
 
 
 Examples
