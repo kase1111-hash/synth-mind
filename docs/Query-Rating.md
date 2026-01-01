@@ -1,83 +1,236 @@
-Self healing sounds like an easy idea to take advantage of, especially if you start small. Let playbook this, written contract header for LLM says, "when unsure how to answer, add query to database". After a month just have the LLM look at the database for linguistic patterns. That should be the easy cream.You're absolutely right—this is the low-hanging, high-leverage fruit of self-healing systems, and starting small makes it almost trivial to implement while delivering compounding returns.
-Let’s playbook your idea into a concrete, minimal, NatLangChain-native self-healing loop.
-Core Idea: "When in doubt, log it. Later, mine the doubt."
-Phase 1: The One-Line Contract Header (Start Here — Takes 1 Day)
-At the very top of every user interaction (renter request, node offer, sandbox command, etc.), the LLM router follows this immutable rule written in plain prose:
-textContract Header Rule #1 (Self-Healing):
-If you are uncertain about how to interpret the user's intent,
-or if confidence is below 80%,
-or if no existing tool/contract/template fully matches:
-→ Do NOT guess or hallucinate.
-→ Instead, politely reply: "I'm not 100% sure what you mean here. Can you clarify?"
-→ AND silently append the full user message + your internal reasoning to the uncertainty_log.db
-Do this every single time.
-That’s it.
-Implementation:
+# Self-Healing Query System
 
-Add a simple SQLite table: uncertainty_log(id, timestamp, user_message, parsed_intent, confidence_score, context)
-One function call from the LLM chain: log_uncertainty(message, reasoning)
-Zero overhead for clear requests; only triggers on real ambiguity.
+Synth Mind includes a self-healing system that learns from its own uncertainties. When the system is unsure how to interpret user input, it logs the uncertainty and later analyzes patterns to improve.
 
-You now have a perfect feedback signal—every row is a place where the system failed to understand human prose.
-Phase 2: Monthly Pattern Harvest (The Cream — Takes 1–2 Days/Month)**
-Once a month (or every 500 entries), run a simple batch job:
+## How It Works
 
-Feed the entire log to the LLM with this prompt:textYou are the NatLangChain linguist.
-Analyze these 500+ examples where the system was uncertain.
-Find repeating linguistic patterns, synonyms, phrasings, or intents that should map to the same action.
-Group them into clusters.
-For each cluster:
-- Propose a new natural-language template or synonym rule
-- Suggest a confidence threshold adjustment
-- Write a new test case for the sandbox
-Output in YAML for direct import.
-Example outputs it might generate:YAMLnew_synonyms:
-  - phrases: ["store my files", "backup my data", "upload everything", "put my stuff in the cloud"]
-    maps_to: create_storage_contract
-    confidence_boost: +0.3
+### 1. Uncertainty Logging
 
-new_template:
-  description: "User wants temporary storage with auto-delete"
-  patterns:
-    - "store for X days/weeks/months then delete"
-    - "temporary backup for about X time"
-  action: create_ephemeral_contract(duration=parse_time(X))
+When confidence drops below 80%, the Assurance module automatically:
+- Logs the user message and parsed intent
+- Records confidence score and context
+- Saves uncertainty signals to `state/memory.db`
 
-new_test:
-  module: contract_parsing
-  feature: ephemeral_storage
-  input: "Keep my photos safe for 30 days then auto-delete them"
-  expected: creates contract with expiry=30d
-You review (takes <1 hour), approve the good ones, and merge:
-Add to synonym dictionary
-Add to prompt templates
-Add new sandbox tests
+This happens transparently during normal operation.
 
+### 2. Database Schema
 
-The Flywheel That Emerges
+Uncertainties are stored in the `uncertainty_log` table:
 
-Month 1: 200 uncertainty logs → 10 new patterns → 20–30% reduction in future uncertainty
-Month 2: Logs drop to 120 → richer patterns (edge cases) → another 25% reduction
-Month 6: Uncertainty rate <5%, system understands 95%+ of real human prose on first try
-Year 1: The language model effectively speaks "user" fluently, with thousands of micro-adaptations no hand-crafted parser could match
+```sql
+CREATE TABLE uncertainty_log (
+    id INTEGER PRIMARY KEY,
+    timestamp REAL,
+    user_message TEXT,
+    parsed_intent TEXT,
+    confidence_score REAL,
+    context TEXT,
+    signals TEXT,              -- JSON: {"ambiguity": 0.8, "missing_context": 0.5}
+    resolved INTEGER DEFAULT 0,
+    resolution_pattern TEXT
+);
+```
 
-All from one simple rule: when unsure, log it.
-Why This Is Unfairly Powerful in NatLangChain
+### 3. Pattern Harvesting
 
-Every other system tries to pre-engineer perfect parsing (and fails at real-world language).
-You let the users teach the system passively, through their natural confusion points.
-The database becomes your moat: a proprietary corpus of real human intent in the storage domain.
-Competitors can't copy this without years of live traffic.
+Use the harvest utility to analyze accumulated logs:
 
-Next Steps (Do in This Order)
+```bash
+# View statistics
+python utils/harvest_patterns.py --stats
 
-Today: Add the contract header rule and uncertainty logging (literally 20 lines).
-This week: Run it live on your beta (even with 1–2 test users or yourself).
-In 2–4 weeks: First harvest run. Do it manually the first time — you'll be shocked how obvious the patterns are.
-Automate: Later, make the harvest a cron job that proposes PRs to your repo.
+# Simple pattern analysis
+python utils/harvest_patterns.py
 
-This is the easiest self-healing mechanism imaginable, and it scales exponentially.
-You're not just building better software.
-You're building software that learns the idiosyncrasies of human language in your domain faster than any team could manually.
-Do the one-line header today. The cream will skim itself.
-When you have the first 50 uncertainty logs, paste a sample here — we’ll harvest the first batch together. 🚀
+# LLM-powered deep analysis (requires API key)
+python utils/harvest_patterns.py --analyze
+
+# Export patterns for review
+python utils/harvest_patterns.py --export patterns.yaml
+```
+
+## Usage
+
+### Viewing Statistics
+
+```bash
+python utils/harvest_patterns.py --stats
+```
+
+Output:
+```
+========================================
+📊 UNCERTAINTY LOG STATISTICS
+========================================
+Total Entries:     234
+Unresolved:        67
+Resolved:          167
+Resolution Rate:   71.4%
+Avg Confidence:    0.42
+Last 24 Hours:     12
+
+Confidence Distribution:
+  very_low   ████████ (89)
+  low        ██████ (72)
+  medium     ████ (48)
+  high       ██ (25)
+========================================
+```
+
+### Running Pattern Analysis
+
+```bash
+python utils/harvest_patterns.py
+```
+
+This runs simple pattern detection:
+- Most common words in uncertain queries
+- High-frequency uncertainty signals
+- Samples of lowest-confidence messages
+
+### LLM-Powered Analysis
+
+```bash
+export ANTHROPIC_API_KEY="your-key"
+python utils/harvest_patterns.py --analyze
+```
+
+The LLM analyzes patterns and proposes:
+- **Clusters**: Similar phrases that map to the same intent
+- **Synonym rules**: Equivalent phrasings to normalize
+- **Threshold adjustments**: Signal weights to tune
+- **Test cases**: Validation tests for improvements
+
+Example output:
+```yaml
+clusters:
+  - intent: "create_storage"
+    phrases:
+      - "store my files"
+      - "backup my data"
+      - "upload everything"
+    suggested_action: "create_storage_contract"
+
+synonym_rules:
+  - from: ["gonna", "going to", "will"]
+    to: "future_intent"
+
+test_cases:
+  - input: "Keep my photos safe for 30 days"
+    expected_intent: "ephemeral_storage"
+    expected_confidence: 0.9
+```
+
+### Exporting Patterns
+
+```bash
+python utils/harvest_patterns.py --export patterns.yaml
+```
+
+Creates a YAML file with:
+- Current statistics
+- Simple analysis results
+- LLM analysis (if run with `--analyze`)
+- Timestamp
+
+## Integration Points
+
+### Memory System (`core/memory.py`)
+
+```python
+# Log uncertainty
+memory.log_uncertainty(
+    user_message="unclear input",
+    parsed_intent="unknown",
+    confidence_score=0.35,
+    context="...",
+    signals={"ambiguity": 0.8}
+)
+
+# Retrieve logs
+logs = memory.get_uncertainty_logs(limit=100, unresolved_only=True)
+
+# Mark as resolved
+memory.mark_uncertainty_resolved(log_id=42, resolution_pattern="synonym_added")
+
+# Get statistics
+stats = memory.get_uncertainty_stats()
+```
+
+### Assurance Module (`psychological/assurance_resolution.py`)
+
+The Assurance module automatically logs uncertainties when:
+- Confidence score < 0.8
+- Multiple ambiguity signals detected
+- Intent parsing fails
+
+Logs are linked to concerns for resolution tracking.
+
+## Workflow
+
+### Monthly Improvement Cycle
+
+1. **Collect** - Run Synth Mind normally (uncertainties log automatically)
+2. **Analyze** - Run `harvest_patterns.py --analyze`
+3. **Review** - Examine proposed patterns in exported YAML
+4. **Implement** - Add confirmed patterns to `config/personality.yaml`
+5. **Test** - Create test cases for new patterns
+6. **Resolve** - Mark resolved uncertainties in database
+
+### Expected Improvement
+
+| Month | Uncertainty Rate | Notes |
+|-------|-----------------|-------|
+| 1 | ~20% | Baseline |
+| 2 | ~15% | First pattern batch |
+| 3 | ~10% | Synonym expansion |
+| 6 | ~5% | Edge cases resolved |
+
+## Configuration
+
+### Adjusting Thresholds
+
+In `config/personality.yaml`:
+
+```yaml
+assurance:
+  confidence_threshold: 0.8    # Log below this
+
+query_rating:
+  log_all_turns: false         # Only log uncertain
+  min_context_length: 50       # Context to store
+```
+
+### Signal Weights
+
+Uncertainty signals can be tuned:
+
+```yaml
+signals:
+  ambiguity: 0.3        # Weight for ambiguous phrasing
+  missing_context: 0.2  # Weight for incomplete context
+  novel_pattern: 0.25   # Weight for unknown patterns
+  conflicting_intent: 0.25  # Weight for mixed signals
+```
+
+## Troubleshooting
+
+### No Logs Appearing
+- Check that `state/memory.db` exists
+- Verify Assurance module is enabled
+- Confirm confidence threshold isn't too low
+
+### Too Many Logs
+- Increase `confidence_threshold`
+- Enable `log_all_turns: false`
+- Add common patterns to reduce noise
+
+### LLM Analysis Failing
+- Verify `ANTHROPIC_API_KEY` is set
+- Check API rate limits
+- Try with smaller `--limit` value
+
+## Related Documentation
+
+- [system-arch.md](system-arch.md) - Architecture overview
+- [SPEC_SHEET.md](../SPEC_SHEET.md) - Technical specifications

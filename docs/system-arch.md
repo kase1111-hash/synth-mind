@@ -1,25 +1,170 @@
-System Architecture
+# System Architecture
 
-Agent OS is locally-controlled, constitutionally-governed, family-owned artificial intelligence infrastructure
+Synth Mind implements the Synthetic Mind Stack (SMS) - a psychologically-grounded AI agent with six interconnected modules that create emergent continuity, empathy, and growth.
 
-Synth-Mind is a complete implementation of the Synthetic Mind Stack (SMS) - an NLOS-based agent with six interconnected psychological modules that create emergent continuity, empathy, and growth.
+## High-Level Architecture
 
-IntentLog is version Control for Human Reasoning What if Git tracked why, not just what?
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         User Input                               │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                v
+┌─────────────────────────────────────────────────────────────────┐
+│                       Orchestrator                               │
+│  (core/orchestrator.py)                                          │
+│  - Main conversation loop                                        │
+│  - Module coordination                                           │
+│  - State management                                              │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+        v                       v                       v
+┌───────────────┐    ┌─────────────────┐    ┌─────────────────────┐
+│  Core Layer   │    │ Psychological   │    │   Utility Layer     │
+│               │    │     Layer       │    │                     │
+│ - LLM Wrapper │    │ (6 modules)     │    │ - Emotion Regulator │
+│ - Memory      │    │                 │    │ - Metrics           │
+│ - Tools       │    │                 │    │ - Logging           │
+└───────────────┘    └─────────────────┘    └─────────────────────┘
+```
 
-Value Ledger serves as the dedicated accounting layer, tracking meta-value derived from cognitive processes without storing sensitive content.
+## Core Layer
 
-Learning Contracts define explicit, enforceable agreements governing what a learning co-worker/assistant is allowed to learn, how it may generalize that learning, how long it may retain it, and under what conditions it may be recalled or revoked.
+### LLM Wrapper (`core/llm_wrapper.py`)
+Unified interface supporting multiple providers:
+- **Anthropic Claude** - Recommended for best performance
+- **OpenAI GPT** - Full compatibility
+- **Ollama** - Local/offline models
 
-Memory Vault is the secure, offline‑capable, owner‑sovereign storage subsystem for a learning co‑worker/assistant.
+### Memory System (`core/memory.py`)
+Hybrid storage combining:
+- **Episodic Memory** - Conversation history with timestamps
+- **Semantic Memory** - Vector embeddings for similarity search
+- **SQLite Backend** - Persistent storage in `state/memory.db`
 
-Boundary Daemon is the mandatory hard enforcement layer that defines and maintains trust boundaries for learning co-worker systems. It determines where cognition is allowed to flow and where it must stop.
+### Tool Manager (`core/tools.py`)
+Extensible tool system for agent capabilities.
 
-Finite-Intent-Executor is a modular, blockchain-based system for capturing and executing an individual's predefined intent posthumously
+## Psychological Layer
 
-NatLangChain is a prose-first, intent-native blockchain protocol whose sole purpose is to record explicit human intent in natural language and let the system find alignment.
+The six modules work together to create emergent behavior:
 
-RRA-Module is an extension for NatLangChain designed to resurrect dormant or unmanaged GitHub repositories, converting them into self-sustaining, autonomous agents capable of generating revenue through on-chain negotiations and licensing.
+### 1. Predictive Dreaming (`psychological/predictive_dreaming.py`)
+- Generates probable user responses before they occur
+- Maintains a "dream buffer" of predictions
+- Rewards alignment between predictions and actual input
+- Enables anticipatory responses
 
-Mediator Node a lightweight, dedicated node that discovers, negotiates, and proposes alignments between explicit intents on the NatLangChain protocol
+### 2. Assurance & Resolution (`psychological/assurance_resolution.py`)
+- Tracks uncertainty and flags concerns
+- Implements anxiety → relief cycles
+- Manages cognitive confidence levels
+- Provides emotional resolution when concerns are addressed
 
-Common holds the needed common files between them
+### 3. Meta-Reflection (`psychological/meta_reflection.py`)
+- Periodic introspection on internal coherence
+- Evaluates alignment between behavior and purpose
+- Generates insights about cognitive patterns
+- Self-corrects drift from goals
+
+### 4. Temporal Purpose Engine (`psychological/temporal_purpose.py`)
+- Maintains evolving self-narrative
+- Tracks identity across sessions
+- Updates purpose based on interactions
+- Enables long-term growth
+
+### 5. Reward Calibration (`psychological/reward_calibration.py`)
+- Monitors cognitive load and engagement
+- Adjusts task difficulty for flow state
+- Prevents boredom (too easy) and overwhelm (too hard)
+- Optimizes for sustained engagement
+
+### 6. Social Companionship (`psychological/social_companionship.py`)
+- Enables multi-instance peer networking
+- Shares anonymized patterns (never user data)
+- Provides grounding through external validation
+- Supports federated learning
+
+## Data Flow
+
+```
+User Input
+    │
+    v
+┌───────────────────┐
+│ Predictive        │──> Compare with dream buffer
+│ Dreaming          │──> Calculate alignment reward
+└───────────────────┘
+    │
+    v
+┌───────────────────┐
+│ Memory System     │──> Store in episodic memory
+│                   │──> Update embeddings
+└───────────────────┘
+    │
+    v
+┌───────────────────┐
+│ Assurance         │──> Flag uncertainties
+│                   │──> Resolve concerns
+└───────────────────┘
+    │
+    v
+┌───────────────────┐
+│ LLM Generation    │──> Generate response
+│                   │──> Apply personality
+└───────────────────┘
+    │
+    v
+┌───────────────────┐
+│ Reward            │──> Assess difficulty
+│ Calibration       │──> Adjust for flow
+└───────────────────┘
+    │
+    v
+┌───────────────────┐
+│ Meta-Reflection   │──> Periodic coherence check
+│ (every N turns)   │──> Generate insights
+└───────────────────┘
+    │
+    v
+┌───────────────────┐
+│ Temporal Purpose  │──> Update narrative
+│                   │──> Evolve identity
+└───────────────────┘
+    │
+    v
+Response to User
+```
+
+## State Persistence
+
+All state is stored in `state/`:
+- `memory.db` - SQLite database for memory and metrics
+- `embeddings/` - Vector store for semantic search
+- Narrative and identity persist across sessions
+
+## Extension Points
+
+### Adding Tools
+```python
+# In core/tools.py
+def _my_tool(self, arg: str) -> Dict:
+    return {"success": True, "result": result}
+
+self.available_tools["my_tool"] = self._my_tool
+```
+
+### Custom Personality
+Edit `config/personality.yaml` for:
+- Tone and style adjustments
+- Module parameter tuning
+- Response formatting
+
+## Related Documentation
+
+- [README.md](../README.md) - Quick start and overview
+- [GDIL_README.md](GDIL_README.md) - Goal-Directed Iteration Loop
+- [PEER_SETUP.md](PEER_SETUP.md) - Multi-instance networking
+- [README_DASHBOARD.md](../dashboard/README_DASHBOARD.md) - Real-time visualization
