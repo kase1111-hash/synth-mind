@@ -1,6 +1,8 @@
 # Synth Mind - Production Dockerfile
 # Multi-stage build for optimized image size
 
+ARG VERSION=0.1.0-alpha
+
 # =============================================================================
 # Stage 1: Builder
 # =============================================================================
@@ -27,6 +29,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Stage 2: Production
 # =============================================================================
 FROM python:3.11-slim as production
+
+ARG VERSION
+LABEL org.opencontainers.image.title="Synth Mind" \
+      org.opencontainers.image.description="A Psychologically Grounded AI Agent" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.source="https://github.com/synth-mind/synth-mind" \
+      org.opencontainers.image.licenses="MIT"
 
 WORKDIR /app
 

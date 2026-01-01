@@ -256,7 +256,7 @@ class PrometheusMetrics:
             'Synth Mind version info',
             ['version']
         )
-        self.info.set(1, version='1.7')
+        self.info.set(1, version='0.1.0-alpha')
 
     def format_prometheus(self) -> str:
         """Format all metrics in Prometheus exposition format."""

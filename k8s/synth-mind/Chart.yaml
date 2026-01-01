@@ -2,8 +2,8 @@ apiVersion: v2
 name: synth-mind
 description: A Helm chart for Synth Mind - Psychologically Grounded AI Agent
 type: application
-version: 1.0.0
-appVersion: "1.7.0"
+version: 0.1.0
+appVersion: "0.1.0-alpha"
 keywords:
   - ai
   - agent

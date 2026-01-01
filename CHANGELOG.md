@@ -5,179 +5,126 @@ All notable changes to Synth Mind will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.0] - 2026-01-01
+## [0.1.0-alpha] - 2026-01-01
 
-### Added
+> **First public alpha release** - Synth Mind is now production-ready for early adopters.
 
-- **Production Readiness Infrastructure**
-  - Health check endpoints (`/health`, `/health/live`, `/health/ready`) for Kubernetes
-  - Prometheus metrics endpoint (`/metrics`) for monitoring
-  - Dockerfile with multi-stage build
-  - docker-compose.yml for local development
-  - GitHub Actions CI/CD pipeline (lint, test, security scan, Docker build)
+### Core Features
 
-- **API Documentation**
-  - OpenAPI 3.1 specification (`docs/openapi.yaml`)
-  - Complete documentation for all 40+ endpoints
+- **Six Psychological Modules**
+  - Predictive Dreaming - Anticipates user responses, rewards alignment
+  - Assurance & Resolution - Manages uncertainty with concern → relief cycles
+  - Meta-Reflection - Periodic introspection and coherence checking
+  - Temporal Purpose Engine - Maintains evolving self-narrative and identity
+  - Reward Calibration - Tunes difficulty to maintain cognitive flow state
+  - Social Companionship - Safe peer exchanges (no user data exposed)
 
-- **Database Migrations**
-  - Alembic migration framework setup
-  - Initial schema migration with indexes
+- **GDIL System (Goal-Directed Iteration Loop)**
+  - 4-phase project lifecycle (EXPLORE → PLAN → ITERATE → SHIP)
+  - Progress tracking with diminishing returns detection
+  - Exit conditions and blockers
+  - 10 built-in project templates
 
-### Changed
+- **Multi-LLM Support**
+  - Anthropic Claude (recommended)
+  - OpenAI GPT models
+  - Local Ollama models
 
-- Updated PRODUCTION_READINESS.md with completed items
-- Production readiness improved from 70% to 95%
+- **Hybrid Memory System**
+  - SQLite + FAISS vector store
+  - Sentence-transformers embeddings
+  - Semantic search and coherence drift detection
 
-## [1.6.0] - 2025-12-31
+### Dashboard & API
 
-### Added
+- **WebSocket Dashboard**
+  - 8-card real-time monitoring
+  - Project timeline/Gantt charts
+  - Interactive controls
 
-- **Comprehensive Documentation Update**
-  - Consolidated documentation in `/docs` folder
-  - Updated SPEC_SHEET.md with current implementation status
-  - Added Repository-Structure.md
+- **REST API**
+  - 40+ endpoints documented in OpenAPI 3.1
+  - Chat API with full cognitive pipeline
+  - Prometheus metrics endpoint
 
-### Changed
+### Security
 
-- Updated GDIL documentation to reflect implemented features
-- Cleaned up redundant documentation files
-
-## [1.5.0] - 2025-12-30
-
-### Added
-
-- **Security Hardening**
-  - IP firewall with whitelist/blacklist/peers-only modes
-  - HTTP access logging with multiple formats (JSON, Common, Combined)
-  - Rate limiting with tiered limits (auth: 5/min, API: 60/min)
-  - HTTPS/WSS encryption support with auto-generated dev certificates
-
-- **Security Test Suite**
-  - End-to-end security tests for command injection
-  - Code execution sandbox tests
-  - Path traversal protection tests
-
-### Fixed
-
-- All medium severity security issues (eval, CORS, auto-install)
-- All low severity security issues (gitignore, token blacklist)
-
-## [1.4.0] - 2025-12-28
-
-### Added
-
-- **Mandelbrot-Zipf Word Weighting**
-  - Information-theoretic word importance scoring
-  - Stopword handling with minimum weights
-  - Domain boost support for technical terms
-  - Integration with Assurance Resolution module
-
-- **Chat API Endpoint**
-  - `/api/chat` for full cognitive pipeline integration
-  - Returns response with emotional state
-
-### Changed
-
-- Improved intent detection accuracy with weighted word matching
-
-## [1.3.0] - 2025-12-25
-
-### Added
-
-- **JWT Authentication**
-  - Role-based access control (admin, operator, viewer)
+- **Authentication**
+  - JWT with role-based access control (admin, operator, viewer)
   - PBKDF2-SHA256 password hashing (100k iterations)
   - Token refresh mechanism
-  - User management API
 
-- **Visual Timeline/Gantt Charts**
-  - Interactive project visualization
-  - Task status colors and tooltips
-  - Multi-project view
+- **Protection Layers**
+  - Rate limiting (tiered: auth 5/min, API 60/min)
+  - IP firewall (whitelist/blacklist/peers modes)
+  - HTTPS/WSS encryption with TLS 1.2+
+  - Tool sandboxing with resource limits
 
-- **Version Control Integration**
-  - Git auto-commit on project milestones
-  - Rollback capability
-  - `/vcs` CLI commands
+- **Boundary Security Integration**
+  - SIEM event reporting (HTTP API + CEF/Syslog)
+  - Daemon policy enforcement (6 security modes)
+  - Centralized error handling with violation detection
 
-## [1.2.0] - 2025-12-20
+### DevOps & Deployment
 
-### Added
+- **Container Support**
+  - Multi-stage Dockerfile
+  - docker-compose for local development
+  - Kubernetes Helm chart
 
-- **Collaborative Multi-Agent Projects**
+- **CI/CD**
+  - GitHub Actions pipeline (lint, test, security, build)
+  - Automated Docker image builds
+
+- **Monitoring**
+  - Health check endpoints (/health, /health/live, /health/ready)
+  - Prometheus metrics exposition
+  - Grafana dashboards
+  - k6 load testing scripts
+
+- **Database**
+  - Alembic migration framework
+  - Initial schema with optimized indexes
+
+### Platform Support
+
+- **Windows**
+  - `setup.bat` - Initial project setup
+  - `start.bat` - CLI startup
+  - `start_dashboard.bat` - Dashboard startup
+
+- **Linux/macOS**
+  - Standard Python virtualenv workflow
+  - Shell-based startup scripts
+
+### Collaboration
+
+- **Multi-Agent Projects**
   - Task claiming and assignment
   - Inter-agent messaging
   - Project sync via API
-  - Agent roles (coordinator, contributor, reviewer)
-
-- **Project Templates**
-  - 10 built-in templates (web-app, api, data-analysis, etc.)
-  - Pre-defined roadmaps and clarification questions
-  - `/templates` and `/project template` commands
 
 - **Federated Learning**
   - Privacy-preserving pattern sharing
   - Differential privacy (ε=1.0)
   - K-anonymity enforcement
 
-## [1.1.0] - 2025-12-15
+### Tools
 
-### Added
-
-- **Multiple Concurrent Projects**
-  - Support for up to 5 active projects
-  - Project switching and pausing
-  - `/projects`, `/project switch`, `/project pause` commands
-
-- **Advanced Tool Manager**
-  - 10 sandboxed tools (calculator, web_search, code_execute, etc.)
-  - Resource limits (10s timeout, 100MB memory)
-  - Restricted builtins for code execution
-
-- **Memory Embeddings**
-  - sentence-transformers integration (all-MiniLM-L6-v2)
-  - OpenAI embeddings fallback
-  - Semantic search and grounding confidence
-  - Coherence drift detection
-
-## [1.0.0] - 2025-12-01
-
-### Added
-
-- **Core Architecture**
-  - Main orchestrator with module integration
-  - LLM wrapper (Anthropic, OpenAI, Ollama support)
-  - Hybrid memory system (SQLite + FAISS)
-
-- **Six Psychological Modules**
-  - Predictive Dreaming (anticipation + alignment scoring)
-  - Assurance & Resolution (uncertainty → relief cycles)
-  - Meta-Reflection (periodic introspection)
-  - Temporal Purpose Engine (identity evolution)
-  - Reward Calibration (flow state optimization)
-  - Social Companionship (peer grounding)
-
-- **GDIL System**
-  - 4-phase project lifecycle
-  - Progress tracking with diminishing returns detection
-  - Exit conditions and blockers
-
-- **Dashboard**
-  - 8-card WebSocket monitoring
-  - Real-time state updates
-  - REST API for programmatic access
-
-- **CLI Interface**
-  - Full command support (/state, /dream, /project, etc.)
-  - Signal handling for graceful shutdown
+- 10 sandboxed tools: calculator, web_search, code_execute, file_read, file_write, image_analyze, json_parse, text_summarize, translate, datetime
+- Resource limits: 10s timeout, 100MB memory
+- Restricted builtins for safe code execution
 
 ---
 
-## Version History Summary
+## Development History
 
-| Version | Date | Highlights |
-|---------|------|------------|
+Prior to v0.1.0-alpha, Synth Mind used internal versioning (1.0.0-1.8.0) during development.
+This history is preserved for reference:
+
+| Internal | Date | Highlights |
+|----------|------|------------|
+| 1.8.0 | 2026-01-01 | Boundary security integration, Windows .bat files |
 | 1.7.0 | 2026-01-01 | Production infrastructure, Prometheus, OpenAPI |
 | 1.6.0 | 2025-12-31 | Documentation consolidation |
 | 1.5.0 | 2025-12-30 | Security hardening (firewall, rate limiting, HTTPS) |
@@ -185,33 +132,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | 1.3.0 | 2025-12-25 | JWT auth, Gantt charts, VCS integration |
 | 1.2.0 | 2025-12-20 | Collaboration, templates, federated learning |
 | 1.1.0 | 2025-12-15 | Multi-project, tools, embeddings |
-| 1.0.0 | 2025-12-01 | Initial release |
+| 1.0.0 | 2025-12-01 | Initial internal release |
 
 ---
 
 ## Upgrading
 
-### From 1.6.x to 1.7.x
+### Fresh Install (Recommended for Alpha)
 
-1. Install new dependencies:
-   ```bash
-   pip install alembic
-   ```
+```bash
+git clone https://github.com/yourusername/synth-mind.git
+cd synth-mind
+pip install -r requirements.txt
+```
 
-2. Run database migrations (optional, for new indexes):
-   ```bash
-   alembic upgrade head
-   ```
+### Docker Deployment
 
-3. Docker deployment now available:
-   ```bash
-   docker-compose up
-   ```
+```bash
+docker-compose up
+```
 
-### From 1.4.x to 1.5.x
+### Database Migrations (if upgrading from development builds)
 
-No breaking changes. Rate limiting and HTTPS are optional features.
+```bash
+pip install alembic
+alembic upgrade head
+```
 
-### From 1.0.x to 1.1.x
+---
 
-Memory system upgraded. Existing memories are preserved but new indexes are created on first run.
+## Known Issues
+
+- WebSocket connections may timeout after extended idle periods
+- Ollama local models require manual installation
+- Collaborative features require network connectivity between peers
+
+---
+
+## Roadmap to v1.0.0
+
+- [ ] Comprehensive integration test suite
+- [ ] PostgreSQL support for multi-instance deployments
+- [ ] Plugin system for custom psychological modules
+- [ ] Web-based admin interface
+- [ ] Mobile-responsive dashboard
