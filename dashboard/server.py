@@ -32,6 +32,24 @@ from utils.access_logger import AccessLogger, AccessLogConfig, LogFormat, create
 from utils.ip_firewall import IPFirewall, FirewallConfig, FirewallMode, create_firewall_middleware
 from utils.prometheus_metrics import get_metrics
 
+# Security integration - Boundary SIEM and Daemon
+try:
+    from security import (
+        init_security,
+        SecurityConfig,
+        get_siem,
+        get_daemon,
+        BoundaryMode,
+        PolicyDecision,
+        ResourceType,
+        Severity,
+        with_error_handling,
+        check_input_security,
+    )
+    SECURITY_AVAILABLE = True
+except ImportError:
+    SECURITY_AVAILABLE = False
+
 class DashboardServer:
     """WebSocket server for streaming internal state to dashboard."""
 
@@ -59,7 +77,9 @@ class DashboardServer:
                  access_log_enabled: bool = True,
                  access_log_config: AccessLogConfig = None,
                  firewall_enabled: bool = False,
-                 firewall_config: FirewallConfig = None):
+                 firewall_config: FirewallConfig = None,
+                 security_enabled: bool = True,
+                 security_config: 'SecurityConfig' = None):
         """
         Initialize the dashboard server.
 
@@ -77,6 +97,8 @@ class DashboardServer:
             access_log_config: Custom access log configuration
             firewall_enabled: Enable IP firewall (default: False)
             firewall_config: Custom firewall configuration
+            security_enabled: Enable Boundary security integration (default: True)
+            security_config: Custom SecurityConfig for SIEM/Daemon connection
         """
         self.orchestrator = orchestrator
         self.port = port
@@ -138,7 +160,18 @@ class DashboardServer:
         else:
             self.firewall = None
 
-        # Build middleware stack (order: firewall -> logging -> rate limit -> auth)
+        # Initialize Boundary security integration (SIEM + Daemon)
+        self.security_enabled = security_enabled and SECURITY_AVAILABLE
+        self.siem = None
+        self.daemon = None
+        if self.security_enabled:
+            try:
+                self.siem, self.daemon = init_security(security_config)
+            except Exception as e:
+                print(f"Warning: Failed to initialize security: {e}")
+                self.security_enabled = False
+
+        # Build middleware stack (order: firewall -> logging -> rate limit -> security -> auth)
         middlewares = []
         if firewall_enabled and self.firewall:
             middlewares.append(create_firewall_middleware(self.firewall))
@@ -146,6 +179,8 @@ class DashboardServer:
             middlewares.append(create_access_log_middleware(self.access_logger))
         if rate_limit_enabled and self.rate_limiter:
             middlewares.append(create_rate_limit_middleware(self.rate_limiter))
+        if self.security_enabled:
+            middlewares.append(self._security_middleware)
         if auth_enabled:
             middlewares.append(self._auth_middleware)
 
@@ -994,6 +1029,131 @@ class DashboardServer:
             )
 
     # =========================================================================
+    # Security Middleware (Boundary SIEM/Daemon Integration)
+    # =========================================================================
+
+    @web.middleware
+    async def _security_middleware(self, request, handler):
+        """
+        Security middleware for Boundary SIEM/Daemon integration.
+        - Checks policy before allowing request
+        - Reports security events to SIEM
+        - Enforces daemon mode restrictions
+        """
+        if not self.security_enabled:
+            return await handler(request)
+
+        # Get client IP
+        peername = request.transport.get_extra_info('peername')
+        client_ip = peername[0] if peername else 'unknown'
+
+        # Check daemon policy for sensitive operations
+        if self.daemon and self.daemon.is_connected():
+            # Map paths to resource types
+            resource_type = self._get_resource_type_for_path(request.path)
+
+            if resource_type:
+                action = request.method.lower()
+                response = self.daemon.check_tool_access(
+                    tool_name=request.path,
+                    action=action,
+                    context={"ip": client_ip, "method": request.method}
+                )
+
+                if response.decision == PolicyDecision.DENY:
+                    # Report blocked request to SIEM
+                    if self.siem:
+                        self.siem.report_access_event(
+                            resource=request.path,
+                            action=action,
+                            allowed=False,
+                            username=request.get('user', {}).get('sub', 'anonymous'),
+                            ip_address=client_ip,
+                            reason=response.reason
+                        )
+
+                    return web.json_response(
+                        {"error": "Access denied by security policy", "reason": response.reason},
+                        status=403
+                    )
+
+        # Execute request
+        try:
+            response = await handler(request)
+
+            # Report successful access to SIEM for sensitive endpoints
+            if self.siem and self._is_sensitive_endpoint(request.path):
+                self.siem.report_access_event(
+                    resource=request.path,
+                    action=request.method.lower(),
+                    allowed=True,
+                    username=request.get('user', {}).get('sub', 'anonymous'),
+                    ip_address=client_ip
+                )
+
+            return response
+
+        except Exception as e:
+            # Report error to SIEM
+            if self.siem:
+                self.siem.report_error(
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    component="dashboard",
+                    context={
+                        "path": request.path,
+                        "method": request.method,
+                        "ip": client_ip
+                    }
+                )
+            raise
+
+    def _get_resource_type_for_path(self, path: str) -> Optional[str]:
+        """Map request paths to resource types for policy checks."""
+        if not SECURITY_AVAILABLE:
+            return None
+
+        sensitive_paths = {
+            '/api/simulate': ResourceType.TOOL,
+            '/api/reflect': ResourceType.TOOL,
+            '/api/generate': ResourceType.LLM,
+            '/api/chat': ResourceType.LLM,
+            '/api/users': ResourceType.DATA,
+            '/api/firewall': ResourceType.NETWORK,
+        }
+
+        for prefix, resource in sensitive_paths.items():
+            if path.startswith(prefix):
+                return resource
+
+        return None
+
+    def _is_sensitive_endpoint(self, path: str) -> bool:
+        """Check if endpoint should be logged to SIEM."""
+        sensitive_prefixes = [
+            '/api/auth',
+            '/api/users',
+            '/api/firewall',
+            '/api/chat',
+            '/api/generate',
+            '/api/simulate',
+            '/api/reflect',
+        ]
+        return any(path.startswith(p) for p in sensitive_prefixes)
+
+    def _report_auth_event(self, action: str, success: bool, username: str = None,
+                           ip_address: str = None, reason: str = None):
+        """Helper to report authentication events to SIEM."""
+        if self.siem:
+            self.siem.report_auth_event(
+                action=action,
+                success=success,
+                username=username,
+                ip_address=ip_address,
+                reason=reason
+            )
+
+    # =========================================================================
     # Authentication Middleware & Endpoints
     # =========================================================================
 
@@ -1125,6 +1285,10 @@ class DashboardServer:
 
     async def auth_login(self, request):
         """Authenticate and get tokens."""
+        # Get client IP for security logging
+        peername = request.transport.get_extra_info('peername')
+        client_ip = peername[0] if peername else 'unknown'
+
         if not self.auth_enabled or not self.auth:
             return web.json_response({
                 "success": True,
@@ -1145,11 +1309,26 @@ class DashboardServer:
             success, tokens = self.auth.authenticate(username, password)
 
             if success:
+                # Report successful login to SIEM
+                self._report_auth_event(
+                    action="login",
+                    success=True,
+                    username=username,
+                    ip_address=client_ip
+                )
                 return web.json_response({
                     "success": True,
                     **tokens
                 })
             else:
+                # Report failed login to SIEM
+                self._report_auth_event(
+                    action="login",
+                    success=False,
+                    username=username,
+                    ip_address=client_ip,
+                    reason="Invalid credentials"
+                )
                 return web.json_response(
                     {"error": "Invalid credentials"},
                     status=401
@@ -1163,12 +1342,25 @@ class DashboardServer:
 
     async def auth_logout(self, request):
         """Logout and blacklist token."""
+        # Get client IP and user info for security logging
+        peername = request.transport.get_extra_info('peername')
+        client_ip = peername[0] if peername else 'unknown'
+        username = request.get('user', {}).get('sub', 'unknown')
+
         if not self.auth_enabled or not self.auth:
             return web.json_response({"success": True})
 
         token = self._get_token_from_request(request)
         if token:
             self.auth.logout(token)
+
+        # Report logout to SIEM
+        self._report_auth_event(
+            action="logout",
+            success=True,
+            username=username,
+            ip_address=client_ip
+        )
 
         return web.json_response({
             "success": True,
@@ -1722,6 +1914,27 @@ class DashboardServer:
         else:
             print(f"  IP Firewall: DISABLED")
 
+        # Show Boundary security integration status
+        if self.security_enabled:
+            print(f"  Boundary Security: ENABLED")
+            if self.siem:
+                print(f"    - SIEM: Connected")
+            else:
+                print(f"    - SIEM: Not available")
+            if self.daemon:
+                if self.daemon.is_connected():
+                    mode = self.daemon.get_current_mode()
+                    print(f"    - Daemon: Connected (mode: {mode.value})")
+                else:
+                    print(f"    - Daemon: Not connected (standalone mode)")
+            else:
+                print(f"    - Daemon: Not available")
+        else:
+            if SECURITY_AVAILABLE:
+                print(f"  Boundary Security: DISABLED")
+            else:
+                print(f"  Boundary Security: NOT AVAILABLE (module not installed)")
+
         print(f"{'='*60}\n")
 
         # Keep server running
@@ -1782,6 +1995,19 @@ async def main():
                          help='IPs to blacklist (space-separated)')
     fw_group.add_argument('--firewall-peers-file', type=str, default='config/peers.txt',
                          help='Peers file for peers_only mode')
+
+    # Boundary Security options
+    sec_group = parser.add_argument_group('Boundary Security Options')
+    sec_group.add_argument('--no-security', action='store_true',
+                          help='Disable Boundary SIEM/Daemon integration')
+    sec_group.add_argument('--siem-url', type=str,
+                          help='Boundary SIEM API URL (default: from env or http://localhost:8080)')
+    sec_group.add_argument('--siem-token', type=str,
+                          help='Boundary SIEM API token (default: from env)')
+    sec_group.add_argument('--daemon-socket', type=str,
+                          help='Boundary Daemon socket path (default: /var/run/boundary/daemon.sock)')
+    sec_group.add_argument('--daemon-url', type=str,
+                          help='Boundary Daemon API URL (default: http://localhost:9090)')
 
     args = parser.parse_args()
 
@@ -1848,6 +2074,28 @@ async def main():
             peers_file=args.firewall_peers_file,
         )
 
+    # Configure Boundary security integration
+    security_config = None
+    security_enabled = not args.no_security and SECURITY_AVAILABLE
+    if security_enabled:
+        # Build config from command line args (overrides environment)
+        config_kwargs = {}
+        if args.siem_url:
+            config_kwargs['siem_api_url'] = args.siem_url
+        if args.siem_token:
+            config_kwargs['siem_api_token'] = args.siem_token
+        if args.daemon_socket:
+            config_kwargs['daemon_socket_path'] = args.daemon_socket
+        if args.daemon_url:
+            config_kwargs['daemon_api_url'] = args.daemon_url
+
+        if config_kwargs:
+            # Load from env first, then override with command line args
+            security_config = SecurityConfig.from_env()
+            for key, value in config_kwargs.items():
+                setattr(security_config, key, value)
+        # else: will use SecurityConfig.from_env() in DashboardServer
+
     print("Initializing Synth Mind with dashboard...")
 
     # Initialize orchestrator
@@ -1866,7 +2114,9 @@ async def main():
         access_log_enabled=not args.no_access_log,
         access_log_config=access_log_config,
         firewall_enabled=args.firewall,
-        firewall_config=firewall_config
+        firewall_config=firewall_config,
+        security_enabled=security_enabled,
+        security_config=security_config
     )
 
     # Start both server and orchestrator

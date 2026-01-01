@@ -116,6 +116,9 @@ CMD ["python", "dashboard/run_synth_with_dashboard.py"]
 | Access Logging | JSON format with rotation | Complete |
 | IP Firewall | Whitelist/blacklist/peers modes | Complete |
 | SSL/TLS | TLS 1.2+ with auto-cert generation | Complete |
+| Boundary SIEM | Security event reporting, CEF format | Complete |
+| Boundary Daemon | Policy enforcement, connection protection | Complete |
+| Error Handling | Centralized with security violation detection | Complete |
 
 ### Security Recommendations for Production
 
@@ -238,17 +241,26 @@ synth-mind/
 ├── Dockerfile                 # Container definition
 ├── docker-compose.yml         # Local multi-container setup
 ├── docker-compose.prod.yml    # Production overrides
+├── setup.bat                  # Windows setup script
+├── start.bat                  # Windows startup (CLI)
+├── start_dashboard.bat        # Windows startup (Dashboard)
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml             # Test on every PR
-│       └── deploy.yml         # Build and deploy
-├── k8s/                       # Kubernetes manifests (optional)
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   └── ingress.yaml
-└── scripts/
-    ├── healthcheck.sh         # Container health check script
-    └── backup.sh              # Database backup script
+│       └── ci.yml             # Test, lint, security, build
+├── security/                  # Boundary security integration
+│   ├── __init__.py            # Module initialization
+│   ├── boundary_siem.py       # SIEM event reporting
+│   ├── boundary_daemon.py     # Policy enforcement
+│   └── error_handler.py       # Centralized error handling
+├── k8s/synth-mind/            # Kubernetes Helm chart
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+├── monitoring/                # Observability stack
+│   ├── grafana/
+│   └── prometheus/
+└── tests/load/                # Load testing
+    └── load_test.js
 ```
 
 ---
@@ -279,6 +291,10 @@ synth-mind/
 - [x] Load testing with k6 (`tests/load/`)
 - [x] Grafana dashboards (`monitoring/grafana/`)
 - [x] Kubernetes Helm chart (`k8s/synth-mind/`)
+- [x] Boundary SIEM integration (`security/boundary_siem.py`)
+- [x] Boundary Daemon integration (`security/boundary_daemon.py`)
+- [x] Centralized error handling (`security/error_handler.py`)
+- [x] Windows batch scripts (`setup.bat`, `start.bat`, `start_dashboard.bat`)
 
 ### All Production Readiness Items Complete!
 

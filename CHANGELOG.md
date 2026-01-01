@@ -5,6 +5,35 @@ All notable changes to Synth Mind will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-01-01
+
+### Added
+
+- **Boundary Security Integration**
+  - Boundary SIEM integration for security event reporting (`security/boundary_siem.py`)
+  - Boundary Daemon integration for policy enforcement (`security/boundary_daemon.py`)
+  - Centralized error handling with security violation detection (`security/error_handler.py`)
+  - CEF format support for syslog-based SIEM integration
+  - Policy modes: OPEN, RESTRICTED, TRUSTED, AIRGAP, COLDROOM, LOCKDOWN
+
+- **Windows Support**
+  - `setup.bat` for initial project setup and virtual environment creation
+  - `start.bat` for CLI-only startup
+  - `start_dashboard.bat` for dashboard mode startup
+
+- **Enhanced Monitoring**
+  - k6 load testing scripts (`tests/load/load_test.js`)
+  - Grafana dashboards for Synth Mind metrics
+  - Prometheus configuration for metrics collection
+  - Kubernetes Helm chart for deployment (`k8s/synth-mind/`)
+
+### Changed
+
+- Dashboard server now reports security events to SIEM
+- Auth endpoints log all login/logout events
+- Policy checks enforced via Boundary Daemon middleware
+- Production readiness improved to 100%
+
 ## [1.7.0] - 2026-01-01
 
 ### Added
