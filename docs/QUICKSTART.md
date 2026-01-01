@@ -50,12 +50,29 @@ Grounding - (If peers configured) Syncing with other instances
 
 Useful Commands
 
-/state - View emotional valence, flow state, metrics
-/dream - See what Synth predicted you'd say
-/reflect - Force introspection now
-/purpose - Read current self-narrative
-/reset - Start fresh (keeps long-term identity)
-/quit - Save and exit
+**Core Commands:**
+- `/state` - View emotional valence, flow state, metrics
+- `/dream` - See what Synth predicted you'd say
+- `/reflect` - Force introspection now
+- `/purpose` - Read current self-narrative
+- `/reset` - Start fresh (keeps long-term identity)
+- `/quit` - Save and exit
+
+**Project Commands:**
+- `/project [desc]` - Start systematic project workflow
+- `/project status` - View project progress
+- `/projects` - List all projects
+- `/templates` - List project templates
+- `/tools` - List available tools
+
+**Collaboration Commands:**
+- `/collab list` - List collaborative projects
+- `/collab create <name>` - Create new project
+- `/collab sync` - Sync with peer agents
+
+**Version Control:**
+- `/vcs status` - Show git status
+- `/vcs history` - Show commit history
 
 Example: Multi-Session Growth
 Session 1:

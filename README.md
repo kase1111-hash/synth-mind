@@ -57,12 +57,45 @@ You'll be dropped into a conversation with a mind that remembers, anticipates, r
 Commands
 While chatting, you can use these commands:
 
-/state - View internal state (valence, flow, metrics)
-/reflect - Force meta-reflection
-/dream - Show current dream buffer
-/purpose - Display self-narrative
-/reset - Clear session (keeps long-term identity)
-/quit - Save and exit
+**State & Reflection:**
+- `/state` - View internal state (valence, flow, metrics)
+- `/reflect` - Force meta-reflection
+- `/dream` - Show current dream buffer
+- `/purpose` - Display self-narrative
+
+**Project Management (GDIL):**
+- `/project [desc]` - Start systematic project workflow
+- `/project status` - View active project progress
+- `/projects` - List all active/paused projects
+- `/project switch <id>` - Switch to different project
+- `/project pause` - Pause current project
+- `/project archive <id>` - Archive a project
+- `/resume project` - Resume paused project
+
+**Project Templates:**
+- `/templates` - List all available templates
+- `/template <id>` - View template details
+- `/project template <id>` - Start project from template
+
+**Tools:**
+- `/tools` - List all 10 available tools
+- `/tool <name>(args)` - Execute a tool
+
+**Collaboration:**
+- `/collab` - Show collaboration help
+- `/collab list` - List collaborative projects
+- `/collab create <name>` - Create new collaborative project
+- `/collab sync` - Sync with peer agents
+
+**Version Control:**
+- `/vcs status` - Show git status
+- `/vcs history` - Show commit history
+- `/vcs commit <msg>` - Create manual commit
+- `/vcs rollback <hash>` - Rollback to commit
+
+**Session:**
+- `/reset` - Clear session (keeps long-term identity)
+- `/quit` - Save and exit
 
 Example Session
 You: Hey Synth, I've been thinking about building a small Natural Language OS.
@@ -100,24 +133,52 @@ Just right → Maintains engagement and motivation
 Development
 Project Structure
 synth-mind/
-├── run_synth.py              # Entry point
+├── run_synth.py                    # CLI entry point
+├── requirements.txt                # Python dependencies
 ├── core/
-│   ├── orchestrator.py       # Main loop
-│   ├── llm_wrapper.py        # LLM interface
-│   ├── memory.py             # Memory system
-│   └── tools.py              # Tool manager
+│   ├── orchestrator.py             # Main loop with all modules
+│   ├── llm_wrapper.py              # Multi-provider LLM interface
+│   ├── memory.py                   # Hybrid vector + SQL memory
+│   └── tools.py                    # 10 sandboxed tools
 ├── psychological/
-│   ├── predictive_dreaming.py
-│   ├── assurance_resolution.py
-│   ├── meta_reflection.py
-│   ├── temporal_purpose.py
-│   ├── reward_calibration.py
-│   └── social_companionship.py
+│   ├── predictive_dreaming.py      # Dream buffer & alignment
+│   ├── assurance_resolution.py     # Uncertainty → relief cycles
+│   ├── meta_reflection.py          # Periodic introspection
+│   ├── temporal_purpose.py         # Identity evolution
+│   ├── reward_calibration.py       # Flow state optimization
+│   ├── social_companionship.py     # Peer grounding
+│   ├── goal_directed_iteration.py  # GDIL project system
+│   ├── project_templates.py        # 10 project templates
+│   ├── collaborative_projects.py   # Multi-agent collaboration
+│   └── federated_learning.py       # Privacy-preserving learning
 ├── utils/
-│   ├── emotion_regulator.py
-│   ├── metrics.py
-│   └── logging.py
-└── state/                    # Auto-generated
+│   ├── emotion_regulator.py        # Valence tracking
+│   ├── metrics.py                  # Performance tracking
+│   ├── logging.py                  # Logging setup
+│   ├── auth.py                     # JWT authentication
+│   ├── version_control.py          # Git integration
+│   ├── mandelbrot_weighting.py     # Word importance weighting
+│   ├── harvest_patterns.py         # Pattern analysis
+│   ├── ssl_utils.py                # SSL/TLS utilities
+│   ├── rate_limiter.py             # API rate limiting
+│   ├── access_logger.py            # HTTP access logging
+│   ├── ip_firewall.py              # IP-based access control
+│   └── ollama_setup.py             # Ollama model setup
+├── dashboard/
+│   ├── server.py                   # WebSocket + REST API
+│   ├── dashboard.html              # 8-card monitoring dashboard
+│   ├── timeline.html               # Gantt chart visualization
+│   └── run_synth_with_dashboard.py # CLI + Dashboard launcher
+├── tests/                          # Test suite
+│   ├── test_core_modules.py
+│   ├── test_psychological_modules.py
+│   ├── test_security_e2e.py
+│   └── test_mandelbrot_e2e.py
+├── config/
+│   ├── personality.yaml            # Personality profiles
+│   └── peers.txt                   # Peer endpoints
+├── docs/                           # Documentation
+└── state/                          # Auto-generated runtime data
 Extending Synth
 Add new tools in core/tools.py:
 pythondef _my_tool(self, arg: str) -> Dict:
@@ -145,12 +206,21 @@ Background tasks: Social companionship checks every 10 min when idle
 
 Roadmap
 
- Voice interface (Whisper + TTS)
- ✅ Multi-agent collaboration protocols (see [PEER_SETUP.md](docs/PEER_SETUP.md))
- Advanced tool integration (code execution, web search)
- Fine-tuned embedding models for better memory
- ✅ Visualization dashboard for internal state
- Federated learning for social layer
+**Completed:**
+- ✅ Multi-agent collaboration protocols (see [PEER_SETUP.md](docs/PEER_SETUP.md))
+- ✅ Visualization dashboard for internal state
+- ✅ Advanced tool integration (10 sandboxed tools including code execution, web search)
+- ✅ Federated learning for social layer
+- ✅ GDIL project workflow system
+- ✅ JWT authentication & security hardening
+- ✅ Version control integration
+- ✅ Project templates library
+- ✅ Gantt chart visualization
+
+**Planned:**
+- Voice interface (Whisper + TTS)
+- Fine-tuned embedding models for better memory
+- Cloud-hosted dashboards
 
 Citation
 If you use Synth Mind in research or projects, please cite:

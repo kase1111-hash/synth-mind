@@ -1,8 +1,8 @@
 # Synth Mind — Technical Specification Sheet
 
-> **Version:** 1.6
-> **Last Updated:** 2024-12-23
-> **Status:** Core Complete — Production Ready (JWT Auth + Gantt Charts + VCS Integration)
+> **Version:** 1.7
+> **Last Updated:** 2026-01-01
+> **Status:** Core Complete — Production Ready (Full Security Hardening + Mandelbrot Weighting)
 
 ---
 
@@ -66,6 +66,8 @@
 | VCS CLI Commands | `core/orchestrator.py` | `/vcs status`, `/vcs history`, `/vcs rollback`, etc. |
 | Personality Configuration | `config/personality.yaml` | 4 personality profiles, GDIL/flow/module settings |
 | Uncertainty Logging | `core/memory.py` | `uncertainty_log` table with full CRUD |
+| Mandelbrot Weighting | `utils/mandelbrot_weighting.py` | Information-theoretic word importance (510+ lines) |
+| Ollama Setup Helper | `utils/ollama_setup.py` | Interactive Ollama model configuration |
 | Query Rating Integration | `psychological/assurance_resolution.py` | Auto-logs low-confidence responses |
 | Pattern Harvest Utility | `utils/harvest_patterns.py` | CLI tool for analysis + LLM-powered patterns |
 | Advanced Tool Manager | `core/tools.py` | 10 tools with sandboxing (665 lines) |
@@ -687,6 +689,95 @@ Privacy-preserving knowledge sharing between synth-mind instances. Enables distr
 
 ---
 
+## Mandelbrot-Zipf Word Weighting
+
+**Status:** ✅ Implemented
+**File:** `utils/mandelbrot_weighting.py`
+
+### Overview
+
+Information-theoretic word weighting system based on the Mandelbrot distribution (generalized Zipf's law). Rare, domain-specific words receive higher weight than common words, improving intent detection and sentiment analysis.
+
+### Formula
+
+```
+weight(word) = C / (rank + β)^α
+```
+
+Where:
+- **rank**: Word frequency rank (1 = most common)
+- **α (alpha)**: Frequency decay exponent (0.5-2.0, default 1.0)
+- **β (beta)**: Rank shift parameter (1.0-10.0, default 2.5)
+- **C**: Normalization constant
+
+### Tuning Parameters
+
+| Parameter | Range | Default | Effect |
+|-----------|-------|---------|--------|
+| `alpha` | 0.5 - 2.0 | 1.0 | Higher = more emphasis on rare words |
+| `beta` | 1.0 - 10.0 | 2.5 | Higher = smoother distribution |
+| `min_weight` | 0.01 - 1.0 | 0.1 | Floor for common/stop words |
+| `max_weight` | 1.0 - 100.0 | 5.0 | Ceiling for rare words |
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Stopword Handling | 100+ English stopwords get minimum weight |
+| Corpus Learning | Builds frequency model from conversation history |
+| Domain Boost | Manual weight multipliers for domain-specific terms |
+| Text Importance | Score text by average word weight |
+| Weighted Sentiment | Frequency-aware sentiment analysis |
+
+### Integration
+
+Used by the Assurance Resolution module (`psychological/assurance_resolution.py`) for:
+- Intent classification with weighted word matching
+- Uncertainty detection with importance-aware scoring
+- Pattern recognition with domain boosting
+
+### API
+
+```python
+from utils.mandelbrot_weighting import MandelbrotWeighting
+
+weighter = MandelbrotWeighting(alpha=1.0, beta=2.5)
+
+# Add text to frequency corpus
+weighter.update_corpus("Your conversation text here")
+
+# Get weight for a word
+weight = weighter.compute_weight("ephemeral")  # High weight (rare)
+weight = weighter.compute_weight("the")        # Low weight (common)
+
+# Weighted word analysis
+weighted = weighter.weight_words("Important domain-specific text")
+
+# Text importance score (0-1)
+importance = weighter.compute_text_importance("Rare technical jargon")
+
+# Configure at runtime
+weighter.configure(alpha=1.5, beta=3.0)
+
+# Domain boost for specific words
+weighter.add_domain_boost({"quantum": 2.0, "neural": 1.5})
+```
+
+### Configuration
+
+Can be configured in `config/personality.yaml`:
+
+```yaml
+mandelbrot_weighting:
+  alpha: 1.0
+  beta: 2.5
+  min_weight: 0.1
+  max_weight: 5.0
+  use_stopwords: true
+```
+
+---
+
 ## Self-Healing System (Query Rating)
 
 **Status:** ✅ Implemented
@@ -921,68 +1012,87 @@ The `code_execute` tool provides:
 
 ```
 synth-mind/
-├── run_synth.py                    # Main CLI entry point
-├── run_synth_with_dashboard.py     # CLI + Dashboard
-├── requirements.txt                # Python dependencies
-├── .env.example                    # Environment template
+├── run_synth.py                       # Main CLI entry point
+├── requirements.txt                   # Python dependencies
+├── SPEC_SHEET.md                      # This specification
+├── SECURITY_REPORT.md                 # Security assessment
 │
 ├── core/
-│   ├── orchestrator.py             # Main processing loop
-│   ├── llm_wrapper.py              # Multi-provider LLM interface
-│   ├── memory.py                   # Hybrid vector + SQL storage
-│   └── tools.py                    # Tool sandbox manager
+│   ├── __init__.py
+│   ├── orchestrator.py                # Main processing loop (700+ lines)
+│   ├── llm_wrapper.py                 # Multi-provider LLM interface
+│   ├── memory.py                      # Hybrid vector + SQL storage (800+ lines)
+│   └── tools.py                       # 10 sandboxed tools (830+ lines)
 │
 ├── psychological/
-│   ├── predictive_dreaming.py      # Anticipation + rewards
-│   ├── assurance_resolution.py     # Uncertainty → relief
-│   ├── meta_reflection.py          # Introspection
-│   ├── temporal_purpose.py         # Identity evolution
-│   ├── reward_calibration.py       # Flow optimization
-│   ├── social_companionship.py     # Peer grounding
-│   └── goal_directed_iteration.py  # GDIL system
+│   ├── __init__.py
+│   ├── predictive_dreaming.py         # Anticipation + rewards
+│   ├── assurance_resolution.py        # Uncertainty → relief
+│   ├── meta_reflection.py             # Introspection
+│   ├── temporal_purpose.py            # Identity evolution
+│   ├── reward_calibration.py          # Flow optimization
+│   ├── social_companionship.py        # Peer grounding
+│   ├── goal_directed_iteration.py     # GDIL system (526+ lines)
+│   ├── project_templates.py           # 10 project templates
+│   ├── collaborative_projects.py      # Multi-agent collaboration (600+ lines)
+│   └── federated_learning.py          # Privacy-preserving learning (450+ lines)
 │
 ├── utils/
-│   ├── emotion_regulator.py        # Valence tracking
-│   ├── metrics.py                  # Performance tracking
-│   ├── logging.py                  # Logging setup
-│   ├── auth.py                     # JWT authentication
-│   ├── version_control.py          # Git VCS integration
-│   ├── ssl_utils.py                # SSL/TLS certificate utilities
-│   ├── rate_limiter.py             # API rate limiting
-│   ├── access_logger.py            # HTTP access logging
-│   └── ip_firewall.py              # IP-based access control
+│   ├── __init__.py
+│   ├── emotion_regulator.py           # Valence tracking
+│   ├── metrics.py                     # Performance tracking
+│   ├── logging.py                     # Logging setup
+│   ├── auth.py                        # JWT authentication (350+ lines)
+│   ├── version_control.py             # Git VCS integration
+│   ├── mandelbrot_weighting.py        # Word importance weighting (510+ lines)
+│   ├── harvest_patterns.py            # Pattern analysis CLI
+│   ├── ssl_utils.py                   # SSL/TLS certificate utilities
+│   ├── rate_limiter.py                # API rate limiting
+│   ├── access_logger.py               # HTTP access logging
+│   ├── ip_firewall.py                 # IP-based access control
+│   └── ollama_setup.py                # Ollama model setup helper
 │
 ├── dashboard/
-│   ├── server.py                   # WebSocket server
-│   ├── dashboard.html              # Main dashboard page
-│   ├── timeline.html               # Gantt chart visualization
-│   └── README_DASHBOARD.md         # Dashboard documentation
+│   ├── server.py                      # WebSocket + REST API (430+ lines)
+│   ├── dashboard.html                 # 8-card monitoring dashboard
+│   ├── timeline.html                  # Gantt chart visualization
+│   ├── run_synth_with_dashboard.py    # CLI + Dashboard launcher
+│   └── README_DASHBOARD.md            # Dashboard documentation
 │
 ├── examples/
-│   └── simple_chat.py              # Demo script
+│   ├── __init__.py
+│   └── simple_chat.py                 # Demo script
 │
 ├── config/
-│   ├── peers.txt                   # Peer endpoints (optional)
-│   └── personality.yaml            # Personality profile (optional)
-│
-├── state/                          # Auto-generated
-│   ├── memory.db                   # Episodic/semantic storage
-│   ├── embeddings/                 # Vector store
-│   └── synth.log                   # Application logs
-│
-├── certs/                          # Auto-generated (gitignored)
-│   ├── server.crt                  # SSL certificate
-│   └── server.key                  # SSL private key
+│   ├── personality.yaml               # Personality profiles & settings
+│   └── peers.txt                      # Peer endpoints (optional)
 │
 ├── tests/
-│   └── test_security_e2e.py        # Security test suite
+│   ├── conftest.py                    # Pytest configuration
+│   ├── test_core_modules.py           # Core module tests
+│   ├── test_psychological_modules.py  # Psychological module tests
+│   ├── test_security_e2e.py           # Security E2E tests
+│   └── test_mandelbrot_e2e.py         # Mandelbrot weighting tests
+│
+├── test_dashboard_integration.py      # Dashboard integration tests
+├── test_gdil_integration.py           # GDIL integration tests
+│
+├── state/                             # Auto-generated
+│   ├── memory.db                      # Episodic/semantic storage
+│   ├── embeddings/                    # Vector store
+│   ├── synth.log                      # Application logs
+│   └── access.log                     # HTTP access logs
+│
+├── certs/                             # Auto-generated (gitignored)
+│   ├── server.crt                     # SSL certificate
+│   └── server.key                     # SSL private key
 │
 └── docs/
-    ├── QUICKSTART.md               # 5-minute setup guide
-    ├── system-arch.md              # High-level architecture
-    ├── GDIL_README.md              # GDIL complete documentation
-    ├── PEER_SETUP.md               # Multi-instance guide
-    └── Repository-Structure.md     # File organization
+    ├── QUICKSTART.md                  # 5-minute setup guide
+    ├── system-arch.md                 # High-level architecture
+    ├── GDIL_README.md                 # GDIL complete documentation
+    ├── PEER_SETUP.md                  # Multi-instance guide
+    └── Repository-Structure.md        # File organization
 ```
 
 ---
