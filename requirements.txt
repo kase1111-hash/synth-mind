@@ -16,6 +16,7 @@ scikit-learn==1.5.2
 # Storage
 sqlalchemy==2.0.36
 aiosqlite==0.20.0
+alembic==1.14.0  # Database migrations
 
 # Utils
 pyyaml==6.0.2

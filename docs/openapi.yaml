@@ -1,0 +1,1194 @@
+openapi: 3.1.0
+info:
+  title: Synth Mind API
+  description: |
+    REST API for Synth Mind - A Psychologically Grounded AI Agent.
+
+    This API provides endpoints for:
+    - Real-time dashboard state monitoring
+    - Chat interactions with the cognitive pipeline
+    - Project management (GDIL system)
+    - Collaborative multi-agent projects
+    - Federated learning
+    - Authentication and user management
+    - System health checks
+  version: 1.7.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  contact:
+    name: Synth Mind Support
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://localhost:8080
+    description: Local HTTPS server
+
+tags:
+  - name: Health
+    description: Health check endpoints for load balancers and orchestration
+  - name: State
+    description: Dashboard state and monitoring
+  - name: Chat
+    description: Cognitive pipeline chat interactions
+  - name: Authentication
+    description: JWT authentication and user management
+  - name: Users
+    description: User management (admin only)
+  - name: Projects
+    description: GDIL project management
+  - name: Collaboration
+    description: Multi-agent collaborative projects
+  - name: Federated
+    description: Federated learning endpoints
+  - name: Security
+    description: Rate limiting, firewall, and access logging
+
+paths:
+  # ===========================================================================
+  # Health Check Endpoints
+  # ===========================================================================
+  /health:
+    get:
+      tags: [Health]
+      summary: Full health check
+      description: Returns detailed status of all components
+      operationId: healthCheck
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+        '503':
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Kubernetes liveness probe - returns 200 if process is alive
+      operationId: healthLive
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: alive
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Kubernetes readiness probe - checks if service can accept traffic
+      operationId: healthReady
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  timestamp:
+                    type: string
+                    format: date-time
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not_ready
+                  reason:
+                    type: string
+
+  # ===========================================================================
+  # State & Dashboard
+  # ===========================================================================
+  /api/state:
+    get:
+      tags: [State]
+      summary: Get current system state
+      description: Returns complete internal state for dashboard display
+      operationId: getState
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current system state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemState'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/simulate:
+    post:
+      tags: [State]
+      summary: Simulate a conversation turn
+      description: Triggers a simulated turn for testing
+      operationId: simulateTurn
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Simulation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/reflect:
+    post:
+      tags: [State]
+      summary: Trigger meta-reflection
+      description: Forces the meta-reflection module to run
+      operationId: triggerReflection
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Reflection triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  result:
+                    type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===========================================================================
+  # Chat
+  # ===========================================================================
+  /api/chat:
+    post:
+      tags: [Chat]
+      summary: Send chat message
+      description: |
+        Process a chat message through the full cognitive pipeline.
+        This runs dreaming, assurance, meta-reflection, and all psychological modules.
+      operationId: chat
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  description: The user's message
+                  example: "Help me design a new feature"
+      responses:
+        '200':
+          description: Chat response with cognitive state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/generate:
+    post:
+      tags: [Chat]
+      summary: Peer-to-peer generation
+      description: Endpoint for social companionship peer communication
+      operationId: peerGenerate
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                temperature:
+                  type: number
+                  default: 0.85
+                max_tokens:
+                  type: integer
+                  default: 150
+      responses:
+        '200':
+          description: Generated response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: string
+                  success:
+                    type: boolean
+
+  # ===========================================================================
+  # Authentication
+  # ===========================================================================
+  /api/auth/status:
+    get:
+      tags: [Authentication]
+      summary: Get authentication status
+      description: Check if auth is enabled and if setup is required
+      operationId: authStatus
+      responses:
+        '200':
+          description: Authentication status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  setup_required:
+                    type: boolean
+                  message:
+                    type: string
+
+  /api/auth/setup:
+    post:
+      tags: [Authentication]
+      summary: Initial admin setup
+      description: Create the initial admin user (only works if no admin exists)
+      operationId: authSetup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+      responses:
+        '200':
+          description: Setup successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate user
+      description: Login and receive JWT tokens
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout user
+      description: Blacklist the current token
+      operationId: authLogout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: Get a new access token using refresh token
+      operationId: authRefresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid refresh token
+
+  # ===========================================================================
+  # User Management
+  # ===========================================================================
+  /api/users:
+    get:
+      tags: [Users]
+      summary: List all users
+      description: Admin only - list all users
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Users]
+      summary: Create user
+      description: Admin only - create a new user
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, operator, viewer]
+                  default: viewer
+      responses:
+        '200':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/users/{username}:
+    delete:
+      tags: [Users]
+      summary: Delete user
+      description: Admin only - delete a user
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: User not found
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/users/{username}/password:
+    put:
+      tags: [Users]
+      summary: Update password
+      description: Admin only - update user password
+      operationId: updatePassword
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/users/{username}/role:
+    put:
+      tags: [Users]
+      summary: Update role
+      description: Admin only - update user role
+      operationId: updateRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [admin, operator, viewer]
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===========================================================================
+  # Timeline / Gantt
+  # ===========================================================================
+  /api/timeline:
+    get:
+      tags: [Projects]
+      summary: Get timeline data
+      description: Get project timeline data for Gantt chart visualization
+      operationId: getTimeline
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Timeline data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelineResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===========================================================================
+  # Collaboration
+  # ===========================================================================
+  /api/collab/projects:
+    get:
+      tags: [Collaboration]
+      summary: Get collaborative projects
+      description: Get projects available for sync with peers
+      operationId: collabProjects
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Collaborative projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  projects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CollabProject'
+
+  /api/collab/sync:
+    post:
+      tags: [Collaboration]
+      summary: Sync with peer
+      description: Receive collaborative project sync from peer agent
+      operationId: collabSync
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Sync successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/collab/stats:
+    get:
+      tags: [Collaboration]
+      summary: Get collaboration stats
+      description: Get statistics about collaborative projects
+      operationId: collabStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Collaboration statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  stats:
+                    type: object
+
+  # ===========================================================================
+  # Federated Learning
+  # ===========================================================================
+  /api/federated/receive:
+    post:
+      tags: [Federated]
+      summary: Receive federated update
+      description: Receive privacy-preserving pattern sharing from peer
+      operationId: federatedReceive
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Update received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '503':
+          description: Federated learning not available
+
+  /api/federated/stats:
+    get:
+      tags: [Federated]
+      summary: Get federated learning stats
+      description: Get statistics about federated learning
+      operationId: federatedStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Federated learning statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  stats:
+                    type: object
+
+  # ===========================================================================
+  # Security - Rate Limiting
+  # ===========================================================================
+  /api/ratelimit/stats:
+    get:
+      tags: [Security]
+      summary: Get rate limiting stats
+      description: Admin only - get rate limiting statistics
+      operationId: rateLimitStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Rate limiting statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  enabled:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===========================================================================
+  # Security - Access Logging
+  # ===========================================================================
+  /api/accesslog/stats:
+    get:
+      tags: [Security]
+      summary: Get access log stats
+      description: Admin only - get access logging statistics
+      operationId: accessLogStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Access log statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  enabled:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===========================================================================
+  # Security - Firewall
+  # ===========================================================================
+  /api/firewall/stats:
+    get:
+      tags: [Security]
+      summary: Get firewall stats
+      description: Admin only - get IP firewall statistics
+      operationId: firewallStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Firewall statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  enabled:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/firewall/rules:
+    get:
+      tags: [Security]
+      summary: Get firewall rules
+      description: Admin only - get current whitelist/blacklist rules
+      operationId: firewallRules
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Firewall rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  whitelist:
+                    type: array
+                    items:
+                      type: string
+                  blacklist:
+                    type: array
+                    items:
+                      type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/firewall/blocked:
+    get:
+      tags: [Security]
+      summary: Get blocked IPs
+      description: Admin only - get blocked request log
+      operationId: firewallBlocked
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Blocked IPs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  blocked:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/firewall/whitelist:
+    post:
+      tags: [Security]
+      summary: Add to whitelist
+      description: Admin only - add IP to whitelist
+      operationId: firewallAddWhitelist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip:
+                  type: string
+                  example: "192.168.1.100"
+      responses:
+        '200':
+          description: IP added to whitelist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    delete:
+      tags: [Security]
+      summary: Remove from whitelist
+      description: Admin only - remove IP from whitelist
+      operationId: firewallRemoveWhitelist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip:
+                  type: string
+      responses:
+        '200':
+          description: IP removed from whitelist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/firewall/blacklist:
+    post:
+      tags: [Security]
+      summary: Add to blacklist
+      description: Admin only - add IP to blacklist
+      operationId: firewallAddBlacklist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip:
+                  type: string
+      responses:
+        '200':
+          description: IP added to blacklist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    delete:
+      tags: [Security]
+      summary: Remove from blacklist
+      description: Admin only - remove IP from blacklist
+      operationId: firewallRemoveBlacklist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip:
+                  type: string
+      responses:
+        '200':
+          description: IP removed from blacklist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# =============================================================================
+# Components
+# =============================================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token from /api/auth/login
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Missing or invalid authorization header"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Insufficient permissions"
+
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    Credentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+        password:
+          type: string
+          minLength: 8
+
+    TokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          description: Token expiry in seconds
+          example: 1800
+
+    User:
+      type: object
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+          enum: [admin, operator, viewer]
+        created_at:
+          type: string
+          format: date-time
+
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "1.7"
+        checks:
+          type: object
+          properties:
+            orchestrator:
+              type: boolean
+            memory:
+              type: boolean
+            llm:
+              type: boolean
+            dreaming:
+              type: boolean
+            assurance:
+              type: boolean
+        websocket_connections:
+          type: integer
+
+    SystemState:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        turn_count:
+          type: integer
+        valence:
+          type: number
+          minimum: -1
+          maximum: 1
+        mood_tags:
+          type: array
+          items:
+            type: string
+        dream_alignment:
+          type: number
+        dream_buffer_size:
+          type: integer
+        difficulty:
+          type: number
+        flow_state:
+          type: string
+          enum: [bored, flow, overloaded]
+        uncertainty:
+          type: number
+        pending_concerns:
+          type: integer
+        coherence:
+          type: number
+        narrative:
+          type: string
+        project:
+          $ref: '#/components/schemas/ProjectState'
+
+    ProjectState:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phase:
+          type: string
+          enum: [initialization, planning, iteration, paused, exit, archived]
+        brief:
+          type: string
+        progress:
+          type: number
+        iterations:
+          type: integer
+        completed_tasks:
+          type: integer
+        total_tasks:
+          type: integer
+        current_subtask:
+          type: string
+        total_projects:
+          type: integer
+
+    ChatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        response:
+          type: string
+          description: The AI's response
+        state:
+          type: object
+          properties:
+            valence:
+              type: number
+            mood_tags:
+              type: array
+              items:
+                type: string
+            turn_count:
+              type: integer
+            dream_alignment:
+              type: number
+            flow_state:
+              type: string
+
+    TimelineResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineProject'
+        total_projects:
+          type: integer
+
+    TimelineProject:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phase:
+          type: string
+        roadmap:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineTask'
+        progress:
+          type: number
+        is_collaborative:
+          type: boolean
+        created_at:
+          type: number
+        updated_at:
+          type: number
+
+    TimelineTask:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, pending_review, blocked]
+        priority:
+          type: integer
+        dependencies:
+          type: array
+          items:
+            type: string
+        progress:
+          type: number
+
+    CollabProject:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        coordinator:
+          type: string
+        active:
+          type: boolean
+        tasks:
+          type: array
+          items:
+            type: object

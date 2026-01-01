@@ -30,6 +30,7 @@ from utils.auth import AuthManager, UserRole
 from utils.rate_limiter import RateLimiter, RateLimitConfig, create_rate_limit_middleware
 from utils.access_logger import AccessLogger, AccessLogConfig, LogFormat, create_access_log_middleware
 from utils.ip_firewall import IPFirewall, FirewallConfig, FirewallMode, create_firewall_middleware
+from utils.prometheus_metrics import get_metrics
 
 class DashboardServer:
     """WebSocket server for streaming internal state to dashboard."""
@@ -39,6 +40,10 @@ class DashboardServer:
         '/',
         '/ws',
         '/timeline',
+        '/health',
+        '/health/live',
+        '/health/ready',
+        '/metrics',
         '/api/auth/login',
         '/api/auth/setup',
         '/api/auth/status',
@@ -214,6 +219,14 @@ class DashboardServer:
         self.app.router.add_post('/api/firewall/blacklist', self.firewall_add_blacklist)
         self.app.router.add_delete('/api/firewall/whitelist', self.firewall_remove_whitelist)
         self.app.router.add_delete('/api/firewall/blacklist', self.firewall_remove_blacklist)
+
+        # Health check endpoints (for Kubernetes/load balancers)
+        self.app.router.add_get('/health', self.health_check)
+        self.app.router.add_get('/health/live', self.health_live)
+        self.app.router.add_get('/health/ready', self.health_ready)
+
+        # Prometheus metrics endpoint
+        self.app.router.add_get('/metrics', self.prometheus_metrics)
 
         # Enable CORS with restricted origins (security fix)
         # Only allow localhost by default - configure allowed_origins for production
@@ -872,6 +885,111 @@ class DashboardServer:
         except Exception as e:
             return web.json_response(
                 {"error": str(e), "success": False},
+                status=500
+            )
+
+    # =========================================================================
+    # Health Check Endpoints (for Kubernetes/Load Balancers)
+    # =========================================================================
+
+    async def health_check(self, request):
+        """
+        Full health check endpoint.
+        Returns detailed status of all components.
+        """
+        try:
+            checks = {
+                "orchestrator": self.orchestrator is not None,
+                "memory": hasattr(self.orchestrator, 'memory') and self.orchestrator.memory is not None,
+                "llm": hasattr(self.orchestrator, 'llm') and self.orchestrator.llm is not None,
+                "dreaming": hasattr(self.orchestrator, 'dreaming') and self.orchestrator.dreaming is not None,
+                "assurance": hasattr(self.orchestrator, 'assurance') and self.orchestrator.assurance is not None,
+            }
+
+            all_healthy = all(checks.values())
+
+            response = {
+                "status": "healthy" if all_healthy else "unhealthy",
+                "timestamp": datetime.now().isoformat(),
+                "version": "1.7",
+                "checks": checks,
+                "websocket_connections": len(self.websockets),
+            }
+
+            return web.json_response(
+                response,
+                status=200 if all_healthy else 503
+            )
+        except Exception as e:
+            return web.json_response(
+                {"status": "unhealthy", "error": str(e)},
+                status=503
+            )
+
+    async def health_live(self, request):
+        """
+        Liveness probe - checks if the process is alive.
+        Used by Kubernetes to restart unhealthy containers.
+        Always returns 200 if the server can respond.
+        """
+        return web.json_response({
+            "status": "alive",
+            "timestamp": datetime.now().isoformat()
+        })
+
+    async def health_ready(self, request):
+        """
+        Readiness probe - checks if the service is ready to accept traffic.
+        Used by Kubernetes to determine if traffic should be routed.
+        """
+        try:
+            # Check critical dependencies
+            ready = (
+                self.orchestrator is not None and
+                hasattr(self.orchestrator, 'llm') and
+                self.orchestrator.llm is not None
+            )
+
+            if ready:
+                return web.json_response({
+                    "status": "ready",
+                    "timestamp": datetime.now().isoformat()
+                })
+            else:
+                return web.json_response(
+                    {"status": "not_ready", "reason": "Dependencies not initialized"},
+                    status=503
+                )
+        except Exception as e:
+            return web.json_response(
+                {"status": "not_ready", "error": str(e)},
+                status=503
+            )
+
+    async def prometheus_metrics(self, request):
+        """
+        Prometheus metrics endpoint.
+        Returns metrics in Prometheus exposition format for scraping.
+        """
+        try:
+            metrics = get_metrics()
+
+            # Update metrics from orchestrator state
+            metrics.update_from_orchestrator(self.orchestrator)
+
+            # Update WebSocket connections
+            metrics.websocket_connections.set(len(self.websockets))
+
+            # Format and return
+            output = metrics.format_prometheus()
+            return web.Response(
+                text=output,
+                content_type='text/plain; version=0.0.4; charset=utf-8'
+            )
+        except Exception as e:
+            return web.Response(
+                text=f"# Error collecting metrics: {e}\n",
+                content_type='text/plain',
                 status=500
             )
 
