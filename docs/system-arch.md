@@ -87,6 +87,37 @@ The six modules work together to create emergent behavior:
 - Provides grounding through external validation
 - Supports federated learning
 
+## Extended Capabilities
+
+### Goal-Directed Iteration Loop (`psychological/goal_directed_iteration.py`)
+- 4-phase project lifecycle (init → plan → iterate → exit)
+- Multiple concurrent projects (up to 5)
+- Version control integration with auto-commit
+- Progress tracking with diminishing returns detection
+
+### Project Templates (`psychological/project_templates.py`)
+- 10 built-in templates (web-app, api, data-analysis, etc.)
+- Pre-defined roadmaps and clarification questions
+- Customizable project scaffolding
+
+### Collaborative Projects (`psychological/collaborative_projects.py`)
+- Multi-agent project coordination
+- Role-based access (coordinator, contributor, reviewer)
+- Task claiming and review workflows
+- Inter-agent messaging
+
+### Federated Learning (`psychological/federated_learning.py`)
+- Privacy-preserving pattern sharing
+- Differential privacy (ε=1.0)
+- K-anonymity enforcement (k=5)
+- Pattern aggregation across instances
+
+### Mandelbrot Weighting (`utils/mandelbrot_weighting.py`)
+- Information-theoretic word importance
+- Frequency-based scoring using Zipf's law
+- Domain-specific term boosting
+- Used for intent detection and uncertainty analysis
+
 ## Data Flow
 
 ```
@@ -165,6 +196,9 @@ Edit `config/personality.yaml` for:
 ## Related Documentation
 
 - [README.md](../README.md) - Quick start and overview
+- [SPEC_SHEET.md](../SPEC_SHEET.md) - Complete technical specification
 - [GDIL_README.md](GDIL_README.md) - Goal-Directed Iteration Loop
 - [PEER_SETUP.md](PEER_SETUP.md) - Multi-instance networking
 - [README_DASHBOARD.md](../dashboard/README_DASHBOARD.md) - Real-time visualization
+- [Repository-Structure.md](Repository-Structure.md) - File organization
+- [SECURITY_REPORT.md](../SECURITY_REPORT.md) - Security assessment

@@ -367,13 +367,38 @@ Future Enhancements
 - [ ] Audio alerts for critical events
 - [ ] Integration with external analytics tools
 
+## Timeline & Gantt Charts
+
+The dashboard includes a dedicated timeline page for project visualization:
+
+**Access:** `http://localhost:8080/timeline`
+
+**Features:**
+- Gantt-style task bars with color-coded status
+- Multi-project view with filtering
+- Task tooltips with progress and dependencies
+- Zoom controls for timeline scaling
+- Auto-refresh every 10 seconds
+- Support for both GDIL and collaborative projects
+
+**Task Status Colors:**
+| Status | Color |
+|--------|-------|
+| Completed | Green |
+| In Progress | Purple (pulsing) |
+| Pending | Gray |
+| Pending Review | Yellow |
+| Blocked | Red |
+
 ## File Structure
 
 ```
 dashboard/
-├── server.py           # WebSocket + REST API server
-├── dashboard.html      # Main dashboard page (embedded in server)
-└── README_DASHBOARD.md # This documentation
+├── server.py              # WebSocket + REST API server
+├── dashboard.html         # Main 8-card monitoring dashboard
+├── timeline.html          # Gantt chart visualization
+├── run_synth_with_dashboard.py  # CLI + Dashboard launcher
+└── README_DASHBOARD.md    # This documentation
 ```
 
 ## Deployment
