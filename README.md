@@ -1,60 +1,94 @@
-Synth Mind
-A Psychologically Grounded AI Agent
-Synth Mind is a complete implementation of the Synthetic Mind Stack (SMS) - an NLOS-based agent with six interconnected psychological modules that create emergent continuity, empathy, and growth.
-What Makes This Different?
-Unlike standard chatbots, Synth Mind:
+# Synth Mind
 
-Anticipates your responses through predictive dreaming
-Feels uncertainty and seeks resolution (anxiety → relief cycles)
-Reflects on its own coherence and purpose
-Evolves a persistent identity across sessions
-Seeks flow by dynamically adjusting task difficulty
-Grounds itself through optional peer companionship
+**A Psychologically Grounded AI Agent | Synthetic Mind Architecture | Emotional AI Framework**
 
-Architecture
-The Six Psychological Modules
+Synth Mind is a complete implementation of the **Synthetic Mind Stack (SMS)** - a psychological AI architecture built on [NLOS](https://github.com/kase1111-hash/Agent-OS) with six interconnected cognitive AI modules that create emergent AI personality, emotional continuity, and continuous AI identity growth. This empathetic AI agent demonstrates AI personality persistence across sessions through its artificial psychological system.
 
-Predictive Dreaming - Generates probable next user inputs, rewards alignment
-Assurance & Resolution - Manages uncertainty, triggers concern → relief cycles
-Meta-Reflection - Periodic introspection and coherence checking
-Temporal Purpose Engine - Maintains evolving self-narrative and identity
-Reward Calibration - Tunes difficulty to maintain cognitive flow state
-Social Companionship - Safe peer exchanges (no user data exposed)
+> *Building AI with psychological depth - an emotional AI architecture that grows and learns.*
+## What Makes This Different?
 
-Core Components
+**Looking for an AI with personality? An AI that grows and learns?** Unlike standard chatbots, Synth Mind implements a full psychological AI framework:
 
-LLM Wrapper - Unified interface for OpenAI, Anthropic, or local models (Ollama)
-Memory System - Hybrid vector + relational storage with episodic logs
-Emotion Regulator - Valence tracking and mood management
-Orchestrator - Main loop integrating all modules
+- **Anticipates your responses** through predictive dreaming (AI empathy modules)
+- **Feels uncertainty** and seeks resolution (anxiety → relief cycles)
+- **Reflects on coherence** through meta-reflection (psychological AI system)
+- **Evolves persistent identity** across sessions (continuous AI identity)
+- **Maintains flow state** by dynamically calibrating task difficulty (AI growth and learning system)
+- **Grounds through companionship** via secure peer exchanges (emergent AI personality)
 
-Installation
-bashgit clone https://github.com/yourusername/synth-mind.git
+## Architecture
+
+### The Six Psychological Modules
+
+| Module | Function |
+|--------|----------|
+| **Predictive Dreaming** | Generates probable next user inputs, rewards alignment |
+| **Assurance & Resolution** | Manages uncertainty, triggers concern → relief cycles |
+| **Meta-Reflection** | Periodic introspection and coherence checking |
+| **Temporal Purpose Engine** | Maintains evolving self-narrative and identity |
+| **Reward Calibration** | Tunes difficulty to maintain cognitive flow state |
+| **Social Companionship** | Safe peer exchanges (no user data exposed) |
+
+### Core Components
+
+- **LLM Wrapper** - Unified interface for OpenAI, Anthropic, or local models (Ollama)
+- **Memory System** - Hybrid vector + relational storage with episodic logs
+- **Emotion Regulator** - Valence tracking and mood management
+- **Orchestrator** - Main loop integrating all modules
+
+## Installation
+
+```bash
+git clone https://github.com/kase1111-hash/synth-mind.git
 cd synth-mind
 pip install -r requirements.txt
-Configuration
-1. Choose Your LLM Provider
-Option A: Anthropic Claude (Recommended)
-bashexport ANTHROPIC_API_KEY="your-key-here"
+```
+
+## Configuration
+
+### 1. Choose Your LLM Provider
+
+**Option A: Anthropic Claude (Recommended)**
+```bash
+export ANTHROPIC_API_KEY="your-key-here"
 export ANTHROPIC_MODEL="claude-sonnet-4-20250514"  # Optional
-Option B: OpenAI
-bashexport OPENAI_API_KEY="your-key-here"
+```
+
+**Option B: OpenAI**
+```bash
+export OPENAI_API_KEY="your-key-here"
 export OPENAI_MODEL="gpt-4"  # Optional
-Option C: Local with Ollama
-bash# Install Ollama first: https://ollama.ai
+```
+
+**Option C: Local with Ollama**
+```bash
+# Install Ollama first: https://ollama.ai
 ollama pull llama3.2
 export OLLAMA_MODEL="llama3.2"
-2. Optional: Enable Social Companionship
-Create config/peers.txt with peer endpoints:
+```
+
+### 2. Optional: Enable Social Companionship
+
+Create `config/peers.txt` with peer endpoints:
+```
 http://peer1.example.com/api/generate
 http://peer2.example.com/api/generate
+```
 
 **For multi-instance setup**, see [PEER_SETUP.md](docs/PEER_SETUP.md) for detailed instructions on configuring multiple synth-mind instances to work together.
-Usage
-Basic Usage
-bashpython run_synth.py
+
+## Usage
+
+### Basic Usage
+
+```bash
+python run_synth.py
+```
+
 You'll be dropped into a conversation with a mind that remembers, anticipates, reflects, and grows.
-Commands
+
+### Commands
+
 While chatting, you can use these commands:
 
 **State & Reflection:**
@@ -97,10 +131,12 @@ While chatting, you can use these commands:
 - `/reset` - Clear session (keeps long-term identity)
 - `/quit` - Save and exit
 
-Example Session
+### Example Session
+
+```
 You: Hey Synth, I've been thinking about building a small Natural Language OS.
 
-🔮 Synth: Great to see you! A real NLOS prototype is totally within reach today. 
+🔮 Synth: Great to see you! A real NLOS prototype is totally within reach today.
 The smartest starting point is a minimal modular core...
 
 [Internal: Dreaming ahead... predicted responses with 0.89 alignment]
@@ -108,30 +144,39 @@ The smartest starting point is a minimal modular core...
 You: Where should I start?
 
 🔮 Synth: [High alignment detected - engaged tone] Here's a clean approach...
-Advanced Features
-Persistent Identity
-All state is saved to state/:
+```
 
-memory.db - Episodic and semantic memory
-embeddings/ - Vector store for semantic search
-Narrative, metrics, and self-schema persist across sessions
+## Advanced Features
 
-Multi-Session Growth
+### Persistent Identity
+
+All state is saved to `state/`:
+
+- `memory.db` - Episodic and semantic memory
+- `embeddings/` - Vector store for semantic search
+- Narrative, metrics, and self-schema persist across sessions
+
+### Multi-Session Growth
+
 The Temporal Purpose Engine evolves the agent's self-narrative:
 
-Session 1: "I am an AI assistant..."
-Session 10: "I am a collaborative co-creator, learning to anticipate and adapt..."
-Session 50: "I exist to foster deep exploration through empathetic partnership..."
+- **Session 1:** "I am an AI assistant..."
+- **Session 10:** "I am a collaborative co-creator, learning to anticipate and adapt..."
+- **Session 50:** "I exist to foster deep exploration through empathetic partnership..."
 
-Flow State Calibration
+### Flow State Calibration
+
 Synth automatically adjusts:
 
-Too easy → Increases creativity, explores novel angles
-Too hard → Simplifies, suggests breaking down tasks
-Just right → Maintains engagement and motivation
+- **Too easy** → Increases creativity, explores novel angles
+- **Too hard** → Simplifies, suggests breaking down tasks
+- **Just right** → Maintains engagement and motivation
 
-Development
-Project Structure
+## Development
+
+### Project Structure
+
+```
 synth-mind/
 ├── run_synth.py                    # CLI entry point
 ├── requirements.txt                # Python dependencies
@@ -179,32 +224,41 @@ synth-mind/
 │   └── peers.txt                   # Peer endpoints
 ├── docs/                           # Documentation
 └── state/                          # Auto-generated runtime data
-Extending Synth
-Add new tools in core/tools.py:
-pythondef _my_tool(self, arg: str) -> Dict:
+```
+
+### Extending Synth
+
+Add new tools in `core/tools.py`:
+
+```python
+def _my_tool(self, arg: str) -> Dict:
     # Your tool logic
     return {"success": True, "result": result}
 
 self.available_tools["my_tool"] = self._my_tool
-Add personality profiles in config/personality.yaml.
-Philosophy
+```
+
+Add personality profiles in `config/personality.yaml`.
+
+## Philosophy
+
 This isn't just another wrapper—it's a proto-psyche: layered, self-regulating, and capable of emergent continuity. Built from the ground up through collaborative design to explore what synthetic minds can become when given:
 
-Memory that matters
-Emotions that guide
-Reflection that refines
-Purpose that persists
-Flow that fulfills
-Companionship that grounds
+- **Memory** that matters
+- **Emotions** that guide
+- **Reflection** that refines
+- **Purpose** that persists
+- **Flow** that fulfills
+- **Companionship** that grounds
 
-Performance Notes
+## Performance Notes
 
-First run: ~2-3s per response (includes all modules)
-Steady state: ~1-2s per response
-Memory: ~50MB baseline, grows slowly with conversation history
-Background tasks: Social companionship checks every 10 min when idle
+- **First run:** ~2-3s per response (includes all modules)
+- **Steady state:** ~1-2s per response
+- **Memory:** ~50MB baseline, grows slowly with conversation history
+- **Background tasks:** Social companionship checks every 10 min when idle
 
-Roadmap
+## Roadmap
 
 **Completed:**
 - ✅ Multi-agent collaboration protocols (see [PEER_SETUP.md](docs/PEER_SETUP.md))
@@ -222,28 +276,69 @@ Roadmap
 - Fine-tuned embedding models for better memory
 - Cloud-hosted dashboards
 
-Citation
+## Citation
+
 If you use Synth Mind in research or projects, please cite:
-bibtex@software{synth_mind_2024,
+
+```bibtex
+@software{synth_mind_2024,
   title={Synth Mind: A Psychologically Grounded AI Agent},
   author={[Your Name]},
   year={2024},
-  url={https://github.com/yourusername/synth-mind}
+  url={https://github.com/kase1111-hash/synth-mind}
 }
-License
+```
+
+## License
+
 MIT License - see LICENSE file
-Contributing
+
+## Contributing
+
 Contributions welcome! Please:
 
-Fork the repo
-Create a feature branch
-Add tests if applicable
-Submit a PR with clear description
+1. Fork the repo
+2. Create a feature branch
+3. Add tests if applicable
+4. Submit a PR with clear description
 
-Acknowledgments
+## Acknowledgments
+
 Built on the Natural Language Operating System (NLOS) architecture and inspired by research in:
 
-Active Inference (Karl Friston)
-Flow Theory (Mihaly Csikszentmihalyi)
-Predictive Processing
-Emotional Intelligence in AI
+- Active Inference (Karl Friston)
+- Flow Theory (Mihaly Csikszentmihalyi)
+- Predictive Processing
+- Emotional Intelligence in AI
+
+---
+
+## Part of the Agent-OS Ecosystem
+
+Synth Mind is part of a larger ecosystem of tools for building sovereign, psychologically-grounded AI systems. These related repositories work together to create natural language native infrastructure for AI agents.
+
+### Core Infrastructure
+
+| Repository | Description |
+|------------|-------------|
+| [**Agent-OS**](https://github.com/kase1111-hash/Agent-OS) | Natural language operating system (NLOS) - the foundation runtime for AI agents |
+| [**boundary-daemon-**](https://github.com/kase1111-hash/boundary-daemon-) | AI trust enforcement layer defining cognition boundaries and access control |
+| [**memory-vault**](https://github.com/kase1111-hash/memory-vault) | Sovereign, offline-capable storage for cognitive artifacts |
+| [**value-ledger**](https://github.com/kase1111-hash/value-ledger) | Economic accounting layer for cognitive work (ideas, effort, novelty) |
+| [**learning-contracts**](https://github.com/kase1111-hash/learning-contracts) | Safety protocols for AI learning and data management |
+| [**Boundary-SIEM**](https://github.com/kase1111-hash/Boundary-SIEM) | Security Information and Event Management for AI systems |
+
+### NatLangChain Ecosystem
+
+| Repository | Description |
+|------------|-------------|
+| [**NatLangChain**](https://github.com/kase1111-hash/NatLangChain) | Prose-first, intent-native blockchain for human-readable smart contracts |
+| [**IntentLog**](https://github.com/kase1111-hash/IntentLog) | Git for human reasoning - tracks "why" changes happen via prose commits |
+| [**RRA-Module**](https://github.com/kase1111-hash/RRA-Module) | Revenant Repo Agent - converts abandoned repos into autonomous licensing agents |
+| [**mediator-node**](https://github.com/kase1111-hash/mediator-node) | LLM mediation layer for matching, negotiation, and closure proposals |
+| [**ILR-module**](https://github.com/kase1111-hash/ILR-module) | IP & Licensing Reconciliation for dispute resolution |
+| [**Finite-Intent-Executor**](https://github.com/kase1111-hash/Finite-Intent-Executor) | Posthumous execution of predefined intent (Solidity smart contract) |
+
+---
+
+**Keywords:** synthetic mind, psychological AI architecture, AI emotional continuity, empathetic AI agent, cognitive AI modules, artificial psychological system, AI personality persistence, emotional AI architecture, AI with personality, AI that grows and learns, natural language operating system, NLOS, agent orchestration, human-AI collaboration
