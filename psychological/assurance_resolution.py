@@ -3,10 +3,8 @@ Assurance & Resolution Module
 Manages cognitive uncertainty and seeks resolution through verification.
 """
 
-import json
-import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 # Import Mandelbrot weighting for frequency-aware word analysis
 try:
@@ -33,7 +31,7 @@ class AssuranceResolutionModule:
         emotion_regulator,
         threshold_uncertain: float = 0.6,
         threshold_risky: float = 0.8,
-        mandelbrot_config: Optional[Dict] = None
+        mandelbrot_config: Optional[dict] = None
     ):
         self.llm = llm
         self.memory = memory
@@ -50,7 +48,7 @@ class AssuranceResolutionModule:
         self.mandelbrot: Optional[MandelbrotWeighting] = None
         self._init_mandelbrot_weighting(mandelbrot_config or {})
 
-    def _init_mandelbrot_weighting(self, config: Dict):
+    def _init_mandelbrot_weighting(self, config: dict):
         """
         Initialize Mandelbrot-Zipf word weighting system.
 
@@ -128,14 +126,14 @@ class AssuranceResolutionModule:
                 max_weight=max_weight
             )
 
-    def get_mandelbrot_stats(self) -> Dict:
+    def get_mandelbrot_stats(self) -> dict:
         """Get current Mandelbrot weighting statistics."""
         if self.mandelbrot:
             return self.mandelbrot.get_stats()
         return {"enabled": False}
-    
+
     def assess_uncertainty(
-        self, response: str, reasoning_trace: Dict, context: str
+        self, response: str, reasoning_trace: dict, context: str
     ) -> tuple:
         """
         Evaluate confidence using multiple signals.
@@ -207,7 +205,7 @@ class AssuranceResolutionModule:
         uncertainty = min(1.0, base_uncertainty)
 
         return uncertainty, signals
-    
+
     def _assess_risk(self, response: str) -> float:
         """
         Assess risk level of response content.
@@ -230,15 +228,15 @@ class AssuranceResolutionModule:
             # Fallback: simple count
             risk_score = sum(1 for term in high_risk_terms if term in response.lower())
             return min(risk_score / 3.0, 1.0)
-    
+
     def trigger_concern(
         self,
         response: str,
         context: str,
-        reasoning_trace: Dict,
+        reasoning_trace: dict,
         uncertainty_score: float,
-        signals: Dict
-    ) -> Dict:
+        signals: dict
+    ) -> dict:
         """Log concern and modulate emotional state."""
         concern = {
             "response": response[:200],
@@ -268,7 +266,7 @@ class AssuranceResolutionModule:
                     signals=signals
                 )
                 concern["uncertainty_log_id"] = log_id
-            except Exception as e:
+            except Exception:
                 # Don't fail the main flow if logging fails
                 pass
 
@@ -285,9 +283,9 @@ class AssuranceResolutionModule:
             self.emotion.adjust_tone("cautious", "hedging")
 
         return concern
-    
+
     def seek_resolution(
-        self, concern: Dict, user_feedback: Optional[str] = None
+        self, concern: dict, user_feedback: Optional[str] = None
     ) -> float:
         """
         Attempt to resolve pending concern.
@@ -295,13 +293,13 @@ class AssuranceResolutionModule:
         """
         resolution_methods = []
         relief_valence = 0.0
-        
+
         # Strategy 1: Self-verification (simplified)
         if concern["uncertainty_score"] < 0.8:
             # Assume self-check passes for moderate uncertainty
             resolution_methods.append("self_verification")
             relief_valence += 0.6
-        
+
         # Strategy 2: User feedback
         if user_feedback:
             sentiment = self._analyze_feedback_sentiment(user_feedback)
@@ -311,16 +309,16 @@ class AssuranceResolutionModule:
             elif sentiment < -0.3:
                 resolution_methods.append("user_correction")
                 relief_valence -= 0.4
-        
+
         # Strategy 3: Memory consistency
         resolution_methods.append("memory_consistency")
         relief_valence += 0.5
-        
+
         # Finalize
         concern["resolved"] = True
         concern["resolution_method"] = resolution_methods
         concern["relief_valence"] = relief_valence
-        
+
         # Apply relief
         if relief_valence > 0:
             self.emotion.apply_reward_signal(
@@ -329,16 +327,16 @@ class AssuranceResolutionModule:
                 intensity=relief_valence
             )
             self.emotion.adjust_tone("relieved", "confident")
-        
+
         # Log
         self.memory.store_episodic(
             event="assurance_cycle",
             content=concern,
             valence=relief_valence
         )
-        
+
         return relief_valence
-    
+
     def _analyze_feedback_sentiment(self, feedback: str) -> float:
         """
         Sentiment analysis of user feedback.
@@ -372,9 +370,9 @@ class AssuranceResolutionModule:
             if pos_count + neg_count == 0:
                 return 0.0
             return (pos_count - neg_count) / (pos_count + neg_count)
-    
+
     def run_cycle(
-        self, response: str, context: str, reasoning_trace: Dict,
+        self, response: str, context: str, reasoning_trace: dict,
         user_feedback: Optional[str] = None, user_message: Optional[str] = None
     ) -> tuple:
         """
@@ -414,7 +412,7 @@ class AssuranceResolutionModule:
         resolved_count = 0
         for concern in self.pending_concerns[:]:
             if not concern["resolved"]:
-                relief = self.seek_resolution(concern, user_feedback)
+                self.seek_resolution(concern, user_feedback)
                 if concern["resolved"]:
                     resolved_count += 1
 
@@ -422,20 +420,20 @@ class AssuranceResolutionModule:
         self.pending_concerns = [c for c in self.pending_concerns if not c["resolved"]]
 
         return uncertainty, resolved_count
-    
+
     def recent_uncertainty_avg(self, n: int = 5) -> float:
         """Get recent average uncertainty for calibration."""
         if not self.uncertainty_history:
             return 0.5
         recent = self.uncertainty_history[-n:]
         return sum(recent) / len(recent)
-    
+
     def assurance_success_rate(self) -> float:
         """Calculate success rate of assurance resolutions."""
         # Placeholder: return high success
         return 0.85
 
-    def get_query_rating_stats(self) -> Dict:
+    def get_query_rating_stats(self) -> dict:
         """
         Get statistics from the Query Rating / Self-Healing system.
         Returns uncertainty log statistics for monitoring.
@@ -457,7 +455,7 @@ class AssuranceResolutionModule:
         if self.mandelbrot:
             self.mandelbrot.save_corpus()
 
-    def explain_word_weight(self, word: str) -> Dict:
+    def explain_word_weight(self, word: str) -> dict:
         """
         Explain the Mandelbrot weight for a specific word.
         Useful for debugging and tuning.
@@ -472,7 +470,7 @@ class AssuranceResolutionModule:
             return self.mandelbrot.explain_weight(word)
         return {"error": "Mandelbrot weighting not enabled"}
 
-    def get_top_weighted_words(self, text: str, n: int = 10) -> List[tuple]:
+    def get_top_weighted_words(self, text: str, n: int = 10) -> list[tuple]:
         """
         Get the top N highest-weighted words from text.
         Useful for understanding which words carry the most signal.

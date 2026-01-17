@@ -17,13 +17,12 @@ Available Tools:
 import asyncio
 import json
 import multiprocessing
-import os
 import re
 import shlex
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 from urllib.parse import quote_plus
 
 
@@ -142,7 +141,7 @@ class ToolManager:
     # Basic Tools
     # ============================================
 
-    def _calculator(self, expression: str) -> Dict[str, Any]:
+    def _calculator(self, expression: str) -> dict[str, Any]:
         """
         Safe mathematical expression evaluator using AST.
         Supports: +, -, *, /, **, %, parentheses, and math functions.
@@ -242,7 +241,7 @@ class ToolManager:
         except Exception as e:
             return {"success": False, "error": str(e), "expression": expression}
 
-    def _timer(self, seconds: int) -> Dict[str, Any]:
+    def _timer(self, seconds: int) -> dict[str, Any]:
         """Timer tool with maximum limit."""
         seconds = min(max(0, seconds), 30)  # 0-30 seconds
         time.sleep(seconds)
@@ -254,7 +253,7 @@ class ToolManager:
 
     def _web_search(
         self, query: str, max_results: int = 5
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Search the web using DuckDuckGo Instant Answer API.
         No API key required.
@@ -317,7 +316,7 @@ class ToolManager:
 
     def _http_fetch(
         self, url: str, extract_text: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Fetch content from a URL.
         Optionally extracts text only (removes HTML tags).
@@ -371,7 +370,7 @@ class ToolManager:
     # Code Execution (Sandboxed)
     # ============================================
 
-    def _code_execute(self, code: str) -> Dict[str, Any]:
+    def _code_execute(self, code: str) -> dict[str, Any]:
         """
         Execute Python code in a restricted sandbox.
         Limited builtins, no file/network access, timeout ENFORCED via multiprocessing.
@@ -439,9 +438,8 @@ class ToolManager:
         This provides true isolation and allows the parent to kill it on timeout.
         """
         import io
-        import sys
         import resource
-        from contextlib import redirect_stdout, redirect_stderr
+        from contextlib import redirect_stderr, redirect_stdout
 
         # Set resource limits (Unix only) - prevents memory bombs
         try:
@@ -449,7 +447,7 @@ class ToolManager:
             resource.setrlimit(resource.RLIMIT_AS, (100 * 1024 * 1024, 100 * 1024 * 1024))
             # Limit CPU time to 10 seconds
             resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
-        except (ValueError, resource.error):
+        except (OSError, ValueError):
             pass  # Not available on all systems
 
         # Restricted builtins - no dangerous operations
@@ -470,12 +468,12 @@ class ToolManager:
         }
 
         # Safe modules only
-        import math
-        import random
+        import collections
         import datetime
         import json as json_module
+        import math
+        import random
         import re as re_module
-        import collections
 
         safe_modules = {
             "math": math,
@@ -539,7 +537,7 @@ class ToolManager:
         except Exception:
             return None
 
-    def _file_read(self, path: str) -> Dict[str, Any]:
+    def _file_read(self, path: str) -> dict[str, Any]:
         """Read a file from the workspace directory."""
         target = self._validate_path(path)
         if not target:
@@ -572,7 +570,7 @@ class ToolManager:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _file_write(self, path: str, content: str) -> Dict[str, Any]:
+    def _file_write(self, path: str, content: str) -> dict[str, Any]:
         """Write content to a file in the workspace directory."""
         target = self._validate_path(path)
         if not target:
@@ -594,7 +592,7 @@ class ToolManager:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _file_list(self, path: str = ".") -> Dict[str, Any]:
+    def _file_list(self, path: str = ".") -> dict[str, Any]:
         """List files and directories in the workspace."""
         target = self._validate_path(path)
         if not target:
@@ -630,7 +628,7 @@ class ToolManager:
     # Shell Commands (Restricted)
     # ============================================
 
-    def _shell_run(self, command: str) -> Dict[str, Any]:
+    def _shell_run(self, command: str) -> dict[str, Any]:
         """
         Run restricted shell commands safely.
         Uses list-based execution to prevent command injection.
@@ -725,7 +723,7 @@ class ToolManager:
 
     def _json_parse(
         self, data: str | dict, path: str = ""
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Parse JSON and extract data using dot notation.
         Path examples: 'users.0.name', 'config.settings.theme'
@@ -771,7 +769,7 @@ class ToolManager:
     # Tool Execution Interface
     # ============================================
 
-    def execute(self, tool_name: str, **kwargs) -> Dict[str, Any]:
+    def execute(self, tool_name: str, **kwargs) -> dict[str, Any]:
         """Execute a tool safely."""
         if tool_name not in self.available_tools:
             return {
@@ -798,24 +796,24 @@ class ToolManager:
                 "error": f"Tool execution failed: {str(e)}"
             }
 
-    async def execute_async(self, tool_name: str, **kwargs) -> Dict[str, Any]:
+    async def execute_async(self, tool_name: str, **kwargs) -> dict[str, Any]:
         """Execute a tool asynchronously (runs in thread pool)."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             None, lambda: self.execute(tool_name, **kwargs)
         )
 
-    def list_tools(self) -> List[str]:
+    def list_tools(self) -> list[str]:
         """List available tools."""
         return list(self.available_tools.keys())
 
-    def get_tool_info(self, tool_name: str) -> Optional[Dict]:
+    def get_tool_info(self, tool_name: str) -> Optional[dict]:
         """Get detailed info about a tool."""
         if tool_name not in self.tool_descriptions:
             return None
         return self.tool_descriptions[tool_name]
 
-    def get_all_tool_info(self) -> Dict[str, Dict]:
+    def get_all_tool_info(self) -> dict[str, dict]:
         """Get info about all tools."""
         return self.tool_descriptions.copy()
 
@@ -824,7 +822,7 @@ class ToolManager:
         name: str,
         func,
         description: str,
-        params: Dict[str, str],
+        params: dict[str, str],
         example: str
     ):
         """Register a custom tool."""

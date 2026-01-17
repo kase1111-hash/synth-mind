@@ -81,6 +81,7 @@ class MockLLM:
     def get_embedding(self, text):
         """Return deterministic embedding based on text hash."""
         import hashlib
+
         import numpy as np
 
         hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)

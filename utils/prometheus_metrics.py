@@ -6,9 +6,8 @@ Tracks request rates, latencies, cognitive module states, and system health.
 """
 
 import time
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 from collections import defaultdict
+from dataclasses import dataclass, field
 from threading import Lock
 
 
@@ -16,18 +15,18 @@ from threading import Lock
 class MetricValue:
     """A single metric value with optional labels."""
     value: float
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
 
 class Counter:
     """Prometheus-style counter (monotonically increasing)."""
 
-    def __init__(self, name: str, help_text: str, labels: List[str] = None):
+    def __init__(self, name: str, help_text: str, labels: list[str] = None):
         self.name = name
         self.help_text = help_text
         self.label_names = labels or []
-        self._values: Dict[tuple, float] = defaultdict(float)
+        self._values: dict[tuple, float] = defaultdict(float)
         self._lock = Lock()
 
     def inc(self, value: float = 1, **labels):
@@ -41,7 +40,7 @@ class Counter:
         label_key = tuple(sorted(labels.items()))
         return self._values.get(label_key, 0)
 
-    def collect(self) -> List[MetricValue]:
+    def collect(self) -> list[MetricValue]:
         """Collect all metric values."""
         with self._lock:
             return [
@@ -53,11 +52,11 @@ class Counter:
 class Gauge:
     """Prometheus-style gauge (can go up and down)."""
 
-    def __init__(self, name: str, help_text: str, labels: List[str] = None):
+    def __init__(self, name: str, help_text: str, labels: list[str] = None):
         self.name = name
         self.help_text = help_text
         self.label_names = labels or []
-        self._values: Dict[tuple, float] = {}
+        self._values: dict[tuple, float] = {}
         self._lock = Lock()
 
     def set(self, value: float, **labels):
@@ -81,7 +80,7 @@ class Gauge:
         label_key = tuple(sorted(labels.items()))
         return self._values.get(label_key, 0)
 
-    def collect(self) -> List[MetricValue]:
+    def collect(self) -> list[MetricValue]:
         """Collect all metric values."""
         with self._lock:
             return [
@@ -96,16 +95,16 @@ class Histogram:
     DEFAULT_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10)
 
     def __init__(self, name: str, help_text: str,
-                 labels: List[str] = None, buckets: tuple = None):
+                 labels: list[str] = None, buckets: tuple = None):
         self.name = name
         self.help_text = help_text
         self.label_names = labels or []
         self.buckets = buckets or self.DEFAULT_BUCKETS
-        self._counts: Dict[tuple, Dict[float, int]] = defaultdict(
-            lambda: {b: 0 for b in self.buckets}
+        self._counts: dict[tuple, dict[float, int]] = defaultdict(
+            lambda: dict.fromkeys(self.buckets, 0)
         )
-        self._sums: Dict[tuple, float] = defaultdict(float)
-        self._totals: Dict[tuple, int] = defaultdict(int)
+        self._sums: dict[tuple, float] = defaultdict(float)
+        self._totals: dict[tuple, int] = defaultdict(int)
         self._lock = Lock()
 
     def observe(self, value: float, **labels):
@@ -118,7 +117,7 @@ class Histogram:
                 if value <= bucket:
                     self._counts[label_key][bucket] += 1
 
-    def collect(self) -> List[MetricValue]:
+    def collect(self) -> list[MetricValue]:
         """Collect all metric values."""
         results = []
         with self._lock:

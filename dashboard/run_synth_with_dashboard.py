@@ -18,8 +18,8 @@ from utils.ollama_setup import prompt_ollama_setup
 
 # Import dashboard server
 try:
-    from aiohttp import web
     import aiohttp_cors
+    from aiohttp import web
     DASHBOARD_AVAILABLE = True
 except ImportError:
     DASHBOARD_AVAILABLE = False
@@ -29,24 +29,24 @@ except ImportError:
 
 class DashboardIntegratedOrchestrator(SynthOrchestrator):
     """Orchestrator with dashboard broadcasting."""
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dashboard_clients = set()
         self.broadcast_queue = asyncio.Queue()
-    
+
     async def _process_turn(self, user_input: str):
         """Override to broadcast state after each turn."""
         await super()._process_turn(user_input)
         # Trigger broadcast
         await self.broadcast_state()
-    
+
     async def broadcast_state(self):
         """Put state update in queue for dashboard clients."""
         if self.dashboard_clients:
             state = self._gather_dashboard_state()
             await self.broadcast_queue.put(state)
-    
+
     def _gather_dashboard_state(self) -> dict:
         """Gather state for dashboard."""
         from datetime import datetime
@@ -155,15 +155,15 @@ async def start_dashboard_server(orchestrator: DashboardIntegratedOrchestrator, 
     """Start the dashboard web server."""
     if not DASHBOARD_AVAILABLE:
         return
-    
+
     app = web.Application()
-    
+
     # Serve static HTML
     async def serve_dashboard(request):
         dashboard_path = Path(__file__).parent / 'dashboard' / 'dashboard.html'
         if dashboard_path.exists():
             return web.FileResponse(dashboard_path)
-        
+
         # Return inline minimal version
         html = """
 <!DOCTYPE html>
@@ -296,19 +296,19 @@ document.getElementById('security-layers').innerHTML=renderSecurityLayers(d.secu
 </body></html>
         """
         return web.Response(text=html, content_type='text/html')
-    
+
     # WebSocket handler
     async def websocket_handler(request):
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         orchestrator.dashboard_clients.add(ws)
-        
+
         print(f"📊 Dashboard connected ({len(orchestrator.dashboard_clients)} clients)")
-        
+
         # Send initial state
         state = orchestrator._gather_dashboard_state()
         await ws.send_json({"type": "state", **state})
-        
+
         # Listen for broadcasts
         try:
             while True:
@@ -320,12 +320,12 @@ document.getElementById('security-layers').innerHTML=renderSecurityLayers(d.secu
         finally:
             orchestrator.dashboard_clients.remove(ws)
             print(f"📊 Dashboard disconnected ({len(orchestrator.dashboard_clients)} clients)")
-        
+
         return ws
-    
+
     app.router.add_get('/', serve_dashboard)
     app.router.add_get('/ws', websocket_handler)
-    
+
     # Enable CORS
     cors = aiohttp_cors.setup(app, defaults={
         "*": aiohttp_cors.ResourceOptions(
@@ -336,23 +336,23 @@ document.getElementById('security-layers').innerHTML=renderSecurityLayers(d.secu
     })
     for route in list(app.router.routes()):
         cors.add(route)
-    
+
     # Start server
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, 'localhost', port)
     await site.start()
-    
+
     print(f"\n{'='*60}")
     print(f"📊 Dashboard: http://localhost:{port}")
     print(f"{'='*60}\n")
-    
+
     # Auto-open browser
     try:
         webbrowser.open(f'http://localhost:{port}')
-    except:
+    except Exception:
         pass
-    
+
     # Keep running
     await asyncio.Event().wait()
 
@@ -375,7 +375,7 @@ def print_banner():
     ║        Chat here + Watch internal state in browser        ║
     ║                                                           ║
     ╚═══════════════════════════════════════════════════════════╝
-    
+
     Commands:
       /state           - View internal state
       /reflect         - Trigger meta-reflection
@@ -386,7 +386,7 @@ def print_banner():
       /resume project  - Resume paused project
       /reset           - Clear session (keeps long-term identity)
       /quit            - Save and exit
-    
+
     """
     print(banner)
 
@@ -431,18 +431,18 @@ async def main():
     except Exception as e:
         print(f"❌ Failed to initialize: {e}")
         sys.exit(1)
-    
+
     # Start dashboard server if available
     if DASHBOARD_AVAILABLE:
-        dashboard_task = asyncio.create_task(start_dashboard_server(orchestrator))
-        broadcast_task = asyncio.create_task(periodic_broadcast(orchestrator))
+        asyncio.create_task(start_dashboard_server(orchestrator))
+        asyncio.create_task(periodic_broadcast(orchestrator))
         # Give server time to start
         await asyncio.sleep(1)
     else:
         print("⚠️  Running without dashboard\n")
-    
+
     print("✓ Synth is online. Type your message or a command.\n")
-    
+
     # Main conversation loop
     try:
         await orchestrator.run()

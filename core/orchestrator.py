@@ -5,39 +5,40 @@ Core Orchestrator - Main conversation loop with all psychological modules.
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional
 
 import yaml
 
 from core.llm_wrapper import LLMWrapper
 from core.memory import MemorySystem
 from core.tools import ToolManager
-from psychological.predictive_dreaming import PredictiveDreamingModule
 from psychological.assurance_resolution import AssuranceResolutionModule
+from psychological.collaborative_projects import CollaborativeProjectManager
+from psychological.goal_directed_iteration import GoalDirectedIterationLoop
 from psychological.meta_reflection import MetaReflectionModule
-from psychological.temporal_purpose import TemporalPurposeEngine
+from psychological.predictive_dreaming import PredictiveDreamingModule
 from psychological.reward_calibration import RewardCalibrationModule
 from psychological.social_companionship import SocialCompanionshipLayer
-from psychological.goal_directed_iteration import GoalDirectedIterationLoop
-from psychological.collaborative_projects import CollaborativeProjectManager
+from psychological.temporal_purpose import TemporalPurposeEngine
 from utils.emotion_regulator import EmotionRegulator
 from utils.metrics import MetricsTracker
 
+
 class SynthOrchestrator:
     """Main orchestrator integrating all SMS modules."""
-    
+
     def __init__(self, config_path: str = "config"):
         self.config_path = Path(config_path)
         self.state_path = Path("state")
         self.state_path.mkdir(exist_ok=True)
-        
+
         # Core components
         self.llm: Optional[LLMWrapper] = None
         self.memory: Optional[MemorySystem] = None
         self.tools: Optional[ToolManager] = None
         self.emotion: Optional[EmotionRegulator] = None
         self.metrics: Optional[MetricsTracker] = None
-        
+
         # Psychological modules
         self.dreaming: Optional[PredictiveDreamingModule] = None
         self.assurance: Optional[AssuranceResolutionModule] = None
@@ -49,19 +50,19 @@ class SynthOrchestrator:
         self.collab: Optional[CollaborativeProjectManager] = None
 
         # Configuration
-        self.personality_config: Dict = {}
+        self.personality_config: dict = {}
 
         # State
         self.context = []
         self.turn_count = 0
         self.running = False
-    
-    def _load_personality_config(self) -> Dict:
+
+    def _load_personality_config(self) -> dict:
         """Load personality configuration from YAML."""
         config_file = self.config_path / "personality.yaml"
         if config_file.exists():
             try:
-                with open(config_file, 'r') as f:
+                with open(config_file) as f:
                     return yaml.safe_load(f) or {}
             except Exception as e:
                 print(f"⚠️  Failed to load personality.yaml: {e}")
@@ -93,23 +94,23 @@ class SynthOrchestrator:
             self.llm, self.memory, self.emotion,
             mandelbrot_config=mandelbrot_config
         )
-        
+
         self.temporal = TemporalPurposeEngine(
             self.memory, self.emotion
         )
-        
+
         self.reflection = MetaReflectionModule(
             self.llm, self.memory, self.emotion, self.temporal
         )
-        
+
         self.calibration = RewardCalibrationModule(
             self.emotion, self.memory, self.dreaming, self.assurance
         )
-        
+
         self.social = SocialCompanionshipLayer(
             self.llm, self.memory, self.emotion, self.temporal
         )
-        
+
         # Initialize GDIL (Goal-Directed Iteration Loop)
         self.gdil = GoalDirectedIterationLoop(
             self.llm,
@@ -135,33 +136,33 @@ class SynthOrchestrator:
         # Start background tasks
         asyncio.create_task(self._background_consolidation())
         asyncio.create_task(self._background_social())
-    
+
     async def run(self):
         """Main conversation loop."""
         self.running = True
-        
+
         while self.running:
             # Get user input
             try:
                 user_input = await self._get_input()
             except EOFError:
                 break
-            
+
             if not user_input.strip():
                 continue
-            
+
             # Handle commands
             if user_input.startswith('/'):
                 await self._handle_command(user_input)
                 continue
-            
+
             # Process turn
             await self._process_turn(user_input)
-    
+
     async def _process_turn(self, user_input: str):
         """Process a single conversation turn with all modules."""
         self.turn_count += 1
-        
+
         # Check if we're in active project mode
         if self.gdil.active_project:
             phase = self.gdil.active_project["phase"]
@@ -181,33 +182,33 @@ class SynthOrchestrator:
                 response = await self.gdil.continue_iteration(user_input)
                 print(f"\n🔮 Synth: {response}\n")
                 return
-        
+
         # Normal conversation flow continues below...
-        
+
         # 1. Resolve previous dreams if any
         if self.dreaming.dream_buffer:
             reward, alignment = self.dreaming.resolve_dreams(user_input)
             self.metrics.log_dream_alignment(alignment)
-            
+
             if alignment < 0.4:
                 # Signal high vigilance to other modules
                 self.assurance.vigilance_level = "HIGH"
-        
+
         # 2. Update context
         self.context.append({"role": "user", "content": user_input})
         context_str = self._format_context()
-        
+
         # 3. Generate draft response (Tier 1 cognition)
         draft_response = await self.llm.generate(
             context_str,
             temperature=self.calibration.creativity_temperature
         )
-        
+
         # 4. Run Assurance cycle
         uncertainty, _ = self.assurance.run_cycle(
             draft_response, context_str, {}
         )
-        
+
         # 5. Meta-cognitive refinement (if needed)
         if uncertainty > 0.6 or self.turn_count % 3 == 0:
             final_response = await self._metacognitive_refine(
@@ -215,44 +216,44 @@ class SynthOrchestrator:
             )
         else:
             final_response = draft_response
-        
+
         # 6. Check for meta-reflection trigger
         reflection_result = await self.reflection.run_cycle(
             context_str,
             self.emotion.current_state(),
             self._gather_metrics()
         )
-        
+
         if reflection_result and reflection_result.get("coherence_score", 1.0) < 0.6:
             # Inject subtle self-awareness
             final_response += "\n\n(Taking a moment to recalibrate...)"
-        
+
         # 7. Apply reward calibration
         calib_state = self.calibration.run_cycle()
-        
+
         # 8. Output response
         print(f"\n🔮 Synth: {final_response}\n")
-        
+
         # 9. Update context and state
         self.context.append({"role": "assistant", "content": final_response})
         self.memory.store_turn(user_input, final_response)
-        
+
         # 10. Dream ahead for next turn
         await self.dreaming.dream_next_turn(self._format_context())
-        
+
         # 11. Update metrics
         self.metrics.update_turn_metrics(
             alignment=self.metrics.last_dream_alignment,
             uncertainty=uncertainty,
             flow_state=calib_state["state"]
         )
-    
+
     async def _metacognitive_refine(
         self, draft: str, user_input: str, context: str
     ) -> str:
         """Internal monologue - critique and refine the draft."""
         current_mood = self.emotion.get_current_state()
-        
+
         prompt = f"""
 Review this Draft Response for quality and alignment.
 
@@ -265,25 +266,25 @@ If meaningful improvements needed, rewrite. Otherwise return original.
 
 Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
 """
-        
+
         critique_raw = await self.llm.generate(prompt, temperature=0.1)
         try:
             critique = json.loads(critique_raw)
             return critique.get("final_response", draft)
-        except:
+        except (json.JSONDecodeError, KeyError):
             return draft
-    
+
     async def _get_input(self) -> str:
         """Get user input asynchronously."""
         return await asyncio.get_event_loop().run_in_executor(
             None, input, "You: "
         )
-    
+
     def _format_context(self, window: int = 20) -> str:
         """Format recent context for prompts."""
         recent = self.context[-window:] if len(self.context) > window else self.context
         return "\n".join([f"{msg['role'].title()}: {msg['content']}" for msg in recent])
-    
+
     def _gather_metrics(self) -> dict:
         """Gather current performance metrics."""
         return {
@@ -291,11 +292,11 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             "assurance_success": self.metrics.assurance_success_rate(),
             "user_sentiment": self.metrics.avg_user_sentiment()
         }
-    
+
     async def _handle_command(self, command: str):
         """Handle special commands."""
         cmd = command.lower().strip()
-        
+
         if cmd == "/state":
             self._print_state()
         elif cmd == "/reflect":
@@ -356,7 +357,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         elif cmd == "/project status":
             status = self.gdil.get_project_status()
             if status:
-                print(f"\n📊 Project Status:")
+                print("\n📊 Project Status:")
                 print(f"  Phase: {status['phase']}")
                 print(f"  Progress: {status['progress']*100:.0f}%")
                 print(f"  Tasks: {status['completed_tasks']}/{status['total_tasks']}")
@@ -385,7 +386,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             project = self.collab.create_project(name, desc)
             print(f"\n🤝 **Created collaborative project:** {project.name}\n")
             print(f"   ID: `{project.id}`")
-            print(f"   Share this ID with other agents to collaborate.\n")
+            print("   Share this ID with other agents to collaborate.\n")
         elif cmd.startswith("/collab view "):
             project_id = command[13:].strip()
             response = self.collab.get_project_details(project_id)
@@ -401,7 +402,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             if self.collab.leave_project(project_id):
                 print(f"\n👋 Left project `{project_id}`\n")
             else:
-                print(f"\n❌ Could not leave project\n")
+                print("\n❌ Could not leave project\n")
         elif cmd.startswith("/collab tasks "):
             project_id = command[14:].strip()
             response = self.collab.list_tasks(project_id)
@@ -455,7 +456,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             print("   Sync initiated. Check /collab list for updates.\n")
         elif cmd == "/collab stats":
             stats = self.collab.get_stats()
-            print(f"\n📊 **Collaboration Stats:**")
+            print("\n📊 **Collaboration Stats:**")
             print(f"   Projects: {stats['active_projects']}/{stats['total_projects']}")
             print(f"   Total Tasks: {stats['total_tasks']}")
             print(f"   Your Claimed: {stats['my_tasks_claimed']}")
@@ -668,13 +669,13 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
                 print(f"   Example: {result['example']}")
 
         print("-" * 40 + "\n")
-    
+
     def _print_state(self):
         """Display current internal state."""
         state = self.emotion.current_state()
         metrics = self._gather_metrics()
         calib = self.calibration.difficulty_moving_avg
-        
+
         print("\n" + "="*60)
         print("INTERNAL STATE")
         print("="*60)
@@ -685,20 +686,20 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         print(f"Turn Count:   {self.turn_count}")
         print(f"Narrative:    {self.temporal.narrative_summary[:60]}...")
         print("="*60 + "\n")
-    
+
     async def _background_consolidation(self):
         """Background task for memory consolidation."""
         while self.running:
             await asyncio.sleep(3600)  # Check hourly
             # Consolidation logic would go here
-    
+
     async def _background_social(self):
         """Background task for social companionship."""
         while self.running:
             await asyncio.sleep(600)  # Check every 10 min
             if self.social.is_idle_enough():
                 await self.social.initiate_companionship_cycle()
-    
+
     async def shutdown(self):
         """Graceful shutdown - save state."""
         self.running = False

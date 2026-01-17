@@ -7,11 +7,11 @@ A psychologically grounded AI agent with full cognitive substrate.
 import asyncio
 import os
 import sys
-from pathlib import Path
 
 from core.orchestrator import SynthOrchestrator
 from utils.logging import setup_logging
 from utils.ollama_setup import prompt_ollama_setup
+
 
 def print_banner():
     """Display startup banner."""

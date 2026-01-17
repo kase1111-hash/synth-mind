@@ -9,7 +9,7 @@ Provides connection protection and policy enforcement via Boundary Daemon:
 - Automatic lockdown on security violations
 """
 
-import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -18,10 +18,8 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
 from threading import Lock
-import hashlib
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +59,11 @@ class PolicyQuery:
     resource_type: ResourceType
     action: str
     target: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     actor: Optional[str] = None
     session_id: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "resource_type": self.resource_type.value,
             "action": self.action,
@@ -83,7 +81,7 @@ class PolicyResponse:
     decision: PolicyDecision
     reason: Optional[str] = None
     expires_at: Optional[str] = None
-    constraints: Dict[str, Any] = field(default_factory=dict)
+    constraints: dict[str, Any] = field(default_factory=dict)
     audit_required: bool = False
 
     @classmethod
@@ -128,7 +126,7 @@ class DaemonConfig:
     cache_ttl: float = 60.0  # seconds
 
     # Mode restrictions
-    allowed_modes: List[BoundaryMode] = field(default_factory=lambda: [
+    allowed_modes: list[BoundaryMode] = field(default_factory=lambda: [
         BoundaryMode.OPEN,
         BoundaryMode.RESTRICTED,
         BoundaryMode.TRUSTED,
@@ -156,7 +154,7 @@ class BoundaryDaemon:
         self.config = config or DaemonConfig()
         self._socket: Optional[socket.socket] = None
         self._current_mode: BoundaryMode = BoundaryMode.OPEN
-        self._decision_cache: Dict[str, Tuple[PolicyResponse, float]] = {}
+        self._decision_cache: dict[str, tuple[PolicyResponse, float]] = {}
         self._cache_lock = Lock()
         self._connected = False
         self._last_health_check = 0.0
@@ -204,7 +202,7 @@ class BoundaryDaemon:
         if self._socket:
             try:
                 self._socket.close()
-            except:
+            except OSError:
                 pass
             self._socket = None
         self._connected = False
@@ -219,7 +217,7 @@ class BoundaryDaemon:
             )
             with urllib.request.urlopen(req, timeout=self.config.connect_timeout) as resp:
                 return resp.status == 200
-        except:
+        except Exception:
             return False
 
     def _fetch_current_mode(self):
@@ -232,14 +230,14 @@ class BoundaryDaemon:
         except Exception as e:
             logger.debug(f"Failed to fetch boundary mode: {e}")
 
-    def _query_daemon(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _query_daemon(self, request: dict[str, Any]) -> Optional[dict[str, Any]]:
         """Send query to daemon and get response."""
         if self._socket:
             return self._query_socket(request)
         else:
             return self._query_http(request)
 
-    def _query_socket(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _query_socket(self, request: dict[str, Any]) -> Optional[dict[str, Any]]:
         """Query via Unix socket."""
         if not self._socket:
             return None
@@ -266,7 +264,7 @@ class BoundaryDaemon:
             self._stats["last_error"] = str(e)
             return None
 
-    def _query_http(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _query_http(self, request: dict[str, Any]) -> Optional[dict[str, Any]]:
         """Query via HTTP API."""
         try:
             import urllib.request
@@ -442,7 +440,7 @@ class BoundaryDaemon:
         self,
         tool_name: str,
         action: str = "execute",
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[dict[str, Any]] = None
     ) -> PolicyResponse:
         """Check if tool execution is allowed."""
         query = PolicyQuery(
@@ -486,7 +484,7 @@ class BoundaryDaemon:
         violation_type: str,
         description: str,
         severity: str = "high",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ):
         """Report a security violation to the daemon."""
         try:
@@ -523,7 +521,7 @@ class BoundaryDaemon:
                 self._current_mode = target_mode
                 return True
             return False
-        except:
+        except Exception:
             return False
 
     def trigger_lockdown(self, reason: str):
@@ -549,7 +547,7 @@ class BoundaryDaemon:
         """Check if connected to daemon."""
         return self._connected
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get client statistics."""
         return {
             **self._stats,

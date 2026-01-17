@@ -3,14 +3,12 @@ Version Control Integration for Synth Mind
 Provides git-based project versioning with auto-commit, rollback, and changelog generation.
 """
 
-import os
-import subprocess
 import json
+import subprocess
 import time
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime
 from enum import Enum
+from pathlib import Path
+from typing import Optional
 
 
 class CommitType(Enum):
@@ -50,7 +48,7 @@ class VersionControlManager:
         # State tracking
         self.is_initialized = False
         self.current_project_branch: Optional[str] = None
-        self.commit_history: List[Dict] = []
+        self.commit_history: list[dict] = []
 
         # Check if git is available
         self.git_available = self._check_git_available()
@@ -68,7 +66,7 @@ class VersionControlManager:
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
 
-    def _run_git(self, *args, cwd: Optional[Path] = None) -> Tuple[bool, str, str]:
+    def _run_git(self, *args, cwd: Optional[Path] = None) -> tuple[bool, str, str]:
         """
         Run a git command and return (success, stdout, stderr).
         """
@@ -89,7 +87,7 @@ class VersionControlManager:
         except Exception as e:
             return False, "", str(e)
 
-    def initialize_repo(self, project_path: Optional[Path] = None) -> Dict:
+    def initialize_repo(self, project_path: Optional[Path] = None) -> dict:
         """
         Initialize a git repository for a project.
         Returns status dict with success and message.
@@ -183,7 +181,7 @@ dist/
 """
         path.write_text(gitignore_content)
 
-    def create_project_branch(self, project_id: str, project_name: str) -> Dict:
+    def create_project_branch(self, project_id: str, project_name: str) -> dict:
         """
         Create a dedicated branch for a project.
         """
@@ -229,9 +227,9 @@ dist/
         message: str,
         project_id: Optional[str] = None,
         subtask_name: Optional[str] = None,
-        files: Optional[List[str]] = None,
+        files: Optional[list[str]] = None,
         auto_stage: bool = True
-    ) -> Dict:
+    ) -> dict:
         """
         Create a commit with semantic message format.
         """
@@ -307,7 +305,7 @@ dist/
         self,
         project_id: Optional[str] = None,
         limit: int = 20
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Get commit history, optionally filtered by project.
         """
@@ -348,7 +346,7 @@ dist/
                             # Filter by project if specified
                             if project_id and metadata.get("project_id") != project_id:
                                 continue
-                        except:
+                        except (json.JSONDecodeError, ValueError):
                             pass
 
                     commits.append(commit)
@@ -360,7 +358,7 @@ dist/
         commit_hash: str,
         soft: bool = True,
         create_backup_branch: bool = True
-    ) -> Dict:
+    ) -> dict:
         """
         Rollback to a specific commit.
         Soft rollback keeps changes as staged, hard rollback discards.
@@ -405,7 +403,7 @@ dist/
                 "message": f"Rollback failed: {stderr}"
             }
 
-    def rollback_subtask(self, project_id: str, subtask_name: str) -> Dict:
+    def rollback_subtask(self, project_id: str, subtask_name: str) -> dict:
         """
         Rollback changes from a specific subtask.
         """
@@ -457,7 +455,7 @@ dist/
         else:
             return self._format_changelog_text(history)
 
-    def _format_changelog_markdown(self, commits: List[Dict]) -> str:
+    def _format_changelog_markdown(self, commits: list[dict]) -> str:
         """Format changelog as markdown."""
         if not commits:
             return "# Changelog\n\nNo commits found.\n"
@@ -499,7 +497,7 @@ dist/
 
         return output
 
-    def _format_changelog_text(self, commits: List[Dict]) -> str:
+    def _format_changelog_text(self, commits: list[dict]) -> str:
         """Format changelog as plain text."""
         if not commits:
             return "Changelog\n=========\n\nNo commits found.\n"
@@ -519,7 +517,7 @@ dist/
         commit1: Optional[str] = None,
         commit2: Optional[str] = None,
         file_path: Optional[str] = None
-    ) -> Dict:
+    ) -> dict:
         """
         Get diff between commits or current changes.
         """
@@ -551,7 +549,7 @@ dist/
                 "message": stderr
             }
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> dict:
         """
         Get current repository status.
         """
@@ -608,7 +606,7 @@ dist/
             "current_project_branch": self.current_project_branch
         }
 
-    def switch_to_main(self) -> Dict:
+    def switch_to_main(self) -> dict:
         """
         Switch back to main/master branch.
         """
@@ -631,7 +629,7 @@ dist/
             "message": "Could not find main or master branch"
         }
 
-    def stash_changes(self, message: Optional[str] = None) -> Dict:
+    def stash_changes(self, message: Optional[str] = None) -> dict:
         """
         Stash current changes.
         """
@@ -649,7 +647,7 @@ dist/
             "message": stdout if success else stderr
         }
 
-    def pop_stash(self) -> Dict:
+    def pop_stash(self) -> dict:
         """
         Pop most recent stash.
         """
@@ -663,7 +661,7 @@ dist/
             "message": stdout if success else stderr
         }
 
-    def list_stashes(self) -> List[Dict]:
+    def list_stashes(self) -> list[dict]:
         """
         List all stashes.
         """
@@ -692,7 +690,7 @@ dist/
         self,
         target_branch: str = "main",
         delete_after: bool = False
-    ) -> Dict:
+    ) -> dict:
         """
         Merge current project branch into target branch.
         """
@@ -734,7 +732,7 @@ dist/
             "deleted_branch": delete_after
         }
 
-    def get_file_history(self, file_path: str, limit: int = 10) -> List[Dict]:
+    def get_file_history(self, file_path: str, limit: int = 10) -> list[dict]:
         """
         Get commit history for a specific file.
         """
@@ -764,7 +762,7 @@ dist/
 
         return history
 
-    def restore_file(self, file_path: str, commit_hash: str) -> Dict:
+    def restore_file(self, file_path: str, commit_hash: str) -> dict:
         """
         Restore a file from a specific commit.
         """

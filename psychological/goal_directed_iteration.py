@@ -8,11 +8,12 @@ Integrates version control for automatic commit tracking.
 
 import json
 import time
-from typing import Dict, List, Optional, Tuple
 from enum import Enum
+from typing import Optional
 
 from psychological.project_templates import ProjectTemplateLibrary
-from utils.version_control import VersionControlManager, CommitType
+from utils.version_control import CommitType, VersionControlManager
+
 
 class ProjectPhase(Enum):
     """Project lifecycle phases."""
@@ -62,9 +63,9 @@ class GoalDirectedIterationLoop:
         self.max_concurrent_projects = max_concurrent_projects
 
         # Multi-project state
-        self.projects: Dict[str, Dict] = {}  # All active projects
+        self.projects: dict[str, dict] = {}  # All active projects
         self.current_project_id: Optional[str] = None  # Currently focused project
-        self.project_history: List[Dict] = []  # Archived/completed projects
+        self.project_history: list[dict] = []  # Archived/completed projects
 
         # Template library
         self.templates = ProjectTemplateLibrary(memory)
@@ -82,14 +83,14 @@ class GoalDirectedIterationLoop:
         self._load_persisted_projects()
 
     @property
-    def active_project(self) -> Optional[Dict]:
+    def active_project(self) -> Optional[dict]:
         """Get the currently focused project."""
         if self.current_project_id and self.current_project_id in self.projects:
             return self.projects[self.current_project_id]
         return None
 
     @active_project.setter
-    def active_project(self, project: Optional[Dict]):
+    def active_project(self, project: Optional[dict]):
         """Set the currently focused project."""
         if project is None:
             self.current_project_id = None
@@ -118,7 +119,7 @@ class GoalDirectedIterationLoop:
     def _save_all_projects(self):
         """Persist all projects to memory."""
         self.memory.store_persistent("gdil_projects", self.projects)
-    
+
     async def start_project(self, user_input: str, project_name: Optional[str] = None) -> str:
         """
         Initialize a new project from user description.
@@ -188,7 +189,7 @@ class GoalDirectedIterationLoop:
         )
 
         return clarification
-    
+
     async def _generate_clarification_questions(self, user_input: str) -> str:
         """Use Predictive Dreaming to identify ambiguities."""
         prompt = f"""
@@ -210,13 +211,13 @@ Output format:
   "identified_uncertainties": ["...", "..."]
 }}
 """
-        
+
         try:
             response = await self.llm.generate(prompt, temperature=0.7, max_tokens=800)
             parsed = self._parse_json_response(response)
-            
+
             # Store uncertainties for Assurance module
-            for uncertainty in parsed.get("identified_uncertainties", []):
+            for _uncertainty in parsed.get("identified_uncertainties", []):
                 self.assurance.trigger_concern(
                     response=user_input,
                     context=user_input,
@@ -224,26 +225,26 @@ Output format:
                     uncertainty_score=0.7,
                     signals={"project_ambiguity": 0.7}
                 )
-            
+
             # Format response
             output = f"{parsed['acknowledgment']}\n\n"
             output += f"**End Goal**: {parsed['end_transformation_query']}\n\n"
             output += "**Questions to refine our approach:**\n"
             for i, q in enumerate(parsed['clarifying_questions'], 1):
                 output += f"{i}. {q}\n"
-            
+
             return output
-            
-        except Exception as e:
+
+        except Exception:
             # Fallback
             return (
                 "Sounds exciting—let's make this happen!\n\n"
-                f"To start, I need to understand:\n"
-                f"1. What should the final output look like?\n"
-                f"2. Any constraints or deadlines?\n"
-                f"3. What aspects matter most to you?"
+                "To start, I need to understand:\n"
+                "1. What should the final output look like?\n"
+                "2. Any constraints or deadlines?\n"
+                "3. What aspects matter most to you?"
             )
-    
+
     async def process_clarification(self, user_response: str) -> str:
         """
         Process user's clarification responses.
@@ -266,23 +267,23 @@ Output format:
             self.active_project["initial_input"],
             user_response
         )
-        
+
         self.active_project["brief"] = brief_and_roadmap["brief"]
         self.active_project["end_transformation"] = brief_and_roadmap["end_transformation"]
         self.active_project["roadmap"] = brief_and_roadmap["roadmap"]
-        
+
         # Update Temporal Purpose
         self.temporal.incorporate_reflection(
             f"Collaborating on project: {brief_and_roadmap['brief'][:100]}",
             "I am a project partner"
         )
-        
+
         # Persist
         self.memory.store_persistent(f"project_{self.active_project['id']}", self.active_project)
-        
+
         return brief_and_roadmap["presentation"]
-    
-    async def _generate_roadmap(self, initial_input: str, clarification: str) -> Dict:
+
+    async def _generate_roadmap(self, initial_input: str, clarification: str) -> dict:
         """Generate project brief and decomposed roadmap."""
         prompt = f"""
 Based on the project description and clarifications, create a structured plan.
@@ -311,7 +312,7 @@ Output JSON:
         try:
             response = await self.llm.generate(prompt, temperature=0.6, max_tokens=1200)
             parsed = self._parse_json_response(response)
-            
+
             # Format presentation
             presentation = f"**Project Brief:**\n{parsed['brief']}\n\n"
             presentation += f"**End Transformation:**\n{parsed['end_transformation']}\n\n"
@@ -320,11 +321,11 @@ Output JSON:
                 presentation += f"{i}. **{task['name']}** (Priority: {task['priority']})\n"
                 presentation += f"   {task['description']}\n"
             presentation += f"\n{parsed['confirmation_question']}"
-            
+
             parsed["presentation"] = presentation
             return parsed
-            
-        except Exception as e:
+
+        except Exception:
             # Fallback
             return {
                 "brief": f"Work on: {initial_input[:100]}",
@@ -332,7 +333,7 @@ Output JSON:
                 "roadmap": [{"name": "Define requirements", "description": "...", "priority": 1, "depends_on": []}],
                 "presentation": "I've outlined a basic plan. Should we proceed?"
             }
-    
+
     async def start_iteration(self, user_confirmation: str) -> str:
         """
         Begin iteration phase.
@@ -352,30 +353,30 @@ Output JSON:
         # Select first subtask
         next_task = self._select_next_subtask()
         return await self._execute_subtask(next_task)
-    
-    def _select_next_subtask(self) -> Dict:
+
+    def _select_next_subtask(self) -> dict:
         """
         Select next subtask based on priority and dependencies.
         Uses Reward Calibration for optimal challenge.
         """
         roadmap = self.active_project["roadmap"]
         completed = [task["name"] for task in self.active_project.get("completed_tasks", [])]
-        
+
         # Find highest priority incomplete task with satisfied dependencies
         for task in sorted(roadmap, key=lambda t: t["priority"], reverse=True):
             if task["name"] not in completed:
                 deps_met = all(dep in completed for dep in task.get("depends_on", []))
                 if deps_met:
                     return task
-        
+
         # Fallback: first incomplete
         for task in roadmap:
             if task["name"] not in completed:
                 return task
-        
+
         return None
-    
-    async def _execute_subtask(self, task: Dict) -> str:
+
+    async def _execute_subtask(self, task: dict) -> str:
         """
         Execute a subtask, asking questions as needed.
         Phase 3: Iteration cycle.
@@ -414,7 +415,7 @@ Output JSON:
         try:
             response = await self.llm.generate(prompt, temperature=0.7, max_tokens=2000)
             parsed = self._parse_json_response(response)
-            
+
             # Store iteration
             iteration = {
                 "task": task["name"],
@@ -424,42 +425,42 @@ Output JSON:
                 "timestamp": time.time()
             }
             self.active_project["iterations"].append(iteration)
-            
+
             # Update progress
             old_score = self.active_project["progress_score"]
             self.active_project["progress_score"] = self._calculate_overall_progress()
             improvement = self.active_project["progress_score"] - old_score
-            
+
             # Check for diminishing returns
             if improvement < self.iteration_threshold:
                 self.active_project["low_progress_count"] += 1
             else:
                 self.active_project["low_progress_count"] = 0
-            
+
             # Emotional response based on progress
             if improvement > 0.15:
                 self.emotion.apply_reward_signal(valence=0.7, label="good_progress", intensity=0.6)
             elif improvement < 0.05:
                 self.emotion.apply_reward_signal(valence=-0.3, label="slow_progress", intensity=0.4)
-            
+
             # Format output
             output = f"**{task['name']}** - Progress: {parsed['progress_estimate']*100:.0f}%\n\n"
             output += f"{parsed['output']}\n\n"
             output += f"*{parsed['explanation']}*\n\n"
-            
+
             if parsed["questions"]:
                 output += "**Questions:**\n"
                 for i, q in enumerate(parsed["questions"], 1):
                     output += f"{i}. {q}\n"
                 output += "\n"
-            
+
             if parsed["blockers"]:
                 self.active_project["blockers"].extend(parsed["blockers"])
                 output += "**Blockers identified:**\n"
                 for b in parsed["blockers"]:
                     output += f"- {b}\n"
                 output += "\n"
-            
+
             # Check for exit condition
             if self.active_project["low_progress_count"] >= self.stall_iterations:
                 output += "\n" + self._initiate_exit("Progress has stalled")
@@ -487,15 +488,15 @@ Output JSON:
             else:
                 output += f"\nOverall project progress: {self.active_project['progress_score']*100:.0f}%\n"
                 output += "Should I continue or adjust course?"
-            
+
             # Persist
             self.memory.store_persistent(f"project_{self.active_project['id']}", self.active_project)
-            
+
             return output
-            
+
         except Exception as e:
             return f"Error executing subtask: {e}\nWhat should we do?"
-    
+
     async def continue_iteration(self, user_feedback: str) -> str:
         """
         Process user feedback and continue iteration.
@@ -515,57 +516,57 @@ Output JSON:
         else:
             next_task = self._select_next_subtask()
             return await self._execute_subtask(next_task)
-    
+
     def _calculate_overall_progress(self) -> float:
         """Calculate overall project progress."""
         total_tasks = len(self.active_project["roadmap"])
         if total_tasks == 0:
             return 0.0
-        
+
         completed = len(self.active_project.get("completed_tasks", []))
-        
+
         # Weight current task progress
         current_progress = 0.0
         if self.active_project.get("iterations"):
             last_iter = self.active_project["iterations"][-1]
             current_progress = last_iter.get("progress", 0.0) / total_tasks
-        
+
         return (completed / total_tasks) + current_progress
-    
+
     def _initiate_exit(self, reason: str) -> str:
         """
         Phase 4: Exit phase - summarize and hand off.
         """
         self.active_project["phase"] = ProjectPhase.EXIT
         self.active_project["exit_reason"] = reason
-        
+
         # Generate comprehensive summary
         completed_count = len(self.active_project.get("completed_tasks", []))
         total_count = len(self.active_project["roadmap"])
         progress_pct = self.active_project["progress_score"] * 100
-        
-        summary = f"**Project Summary**\n\n"
+
+        summary = "**Project Summary**\n\n"
         summary += f"**Status:** {reason}\n\n"
         summary += f"**Completion:** {progress_pct:.0f}% ({completed_count}/{total_count} subtasks)\n\n"
-        
-        summary += f"**What we accomplished:**\n"
+
+        summary += "**What we accomplished:**\n"
         for task in self.active_project.get("completed_tasks", []):
             summary += f"✓ {task['name']}\n"
-        
+
         if self.active_project["blockers"]:
-            summary += f"\n**Blockers:**\n"
+            summary += "\n**Blockers:**\n"
             for blocker in set(self.active_project["blockers"]):
                 summary += f"- {blocker}\n"
-            
+
             remaining = total_count - completed_count
             impact_pct = (remaining / total_count * 100) if total_count > 0 else 0
             summary += f"\n*These affect the remaining {impact_pct:.0f}% of the project.*\n"
-        
-        summary += f"\n**Next Steps:**\n"
+
+        summary += "\n**Next Steps:**\n"
         summary += "- Provide missing information to continue\n"
         summary += "- Use `/resume project` to pick up where we left off\n"
         summary += "- Or start a new approach\n"
-        
+
         # Apply relief through Assurance
         self.emotion.apply_reward_signal(valence=0.5, label="project_exit_clarity", intensity=0.5)
 
@@ -586,7 +587,7 @@ Output JSON:
         self.project_history.append(self.active_project)
 
         return summary
-    
+
     def resume_project(self, project_id: Optional[str] = None) -> str:
         """Resume a paused or exited project."""
         if project_id:
@@ -594,22 +595,22 @@ Output JSON:
         else:
             # Resume most recent
             project = self.project_history[-1] if self.project_history else None
-        
+
         if not project:
             return "No project to resume. Start a new one with /project [description]"
-        
+
         self.active_project = project
         self.active_project["phase"] = ProjectPhase.ITERATION
         self.active_project["low_progress_count"] = 0
-        
-        summary = f"**Resuming Project**\n\n"
+
+        summary = "**Resuming Project**\n\n"
         summary += f"Brief: {project['brief']}\n"
         summary += f"Progress: {project['progress_score']*100:.0f}%\n\n"
         summary += "Continuing from where we left off...\n"
-        
+
         return summary
-    
-    def _parse_json_response(self, response: str) -> Dict:
+
+    def _parse_json_response(self, response: str) -> dict:
         """Parse JSON from LLM response with fallback."""
         try:
             # Try to find JSON in response
@@ -617,9 +618,9 @@ Output JSON:
             end = response.rfind('}') + 1
             if start != -1 and end > start:
                 return json.loads(response[start:end])
-        except:
+        except (json.JSONDecodeError, ValueError):
             pass
-        
+
         # Fallback
         return {
             "acknowledgment": "Let's work on this together.",
@@ -627,8 +628,8 @@ Output JSON:
             "clarifying_questions": ["What are the key requirements?"],
             "identified_uncertainties": []
         }
-    
-    def get_project_status(self) -> Optional[Dict]:
+
+    def get_project_status(self) -> Optional[dict]:
         """Get current project status for dashboard."""
         if not self.active_project:
             return None
@@ -812,7 +813,7 @@ Output JSON:
         name = target.get("name", "Unnamed")
         return f"Project **{name}** archived."
 
-    def get_all_projects_status(self) -> List[Dict]:
+    def get_all_projects_status(self) -> list[dict]:
         """Get status of all projects for dashboard."""
         statuses = []
         for project in self.projects.values():
@@ -1048,7 +1049,7 @@ Output JSON:
             result = self.vcs.rollback_to_commit(target, soft=True)
 
         if result.get("success"):
-            output = f"✓ **Rollback successful**\n\n"
+            output = "✓ **Rollback successful**\n\n"
             output += f"{result.get('message', '')}\n"
             if result.get("backup_branch"):
                 output += f"\nBackup created: `{result['backup_branch']}`\n"

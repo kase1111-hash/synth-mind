@@ -3,8 +3,8 @@ Project Templates Library for GDIL
 Pre-defined templates for common project types with roadmaps and clarification questions.
 """
 
-from typing import Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass
@@ -16,14 +16,14 @@ class ProjectTemplate:
     category: str
     suggested_brief: str
     end_transformation: str
-    roadmap: List[Dict]
-    clarifying_questions: List[str]
-    tags: List[str] = field(default_factory=list)
+    roadmap: list[dict]
+    clarifying_questions: list[str]
+    tags: list[str] = field(default_factory=list)
     estimated_iterations: int = 5
 
 
 # Built-in templates
-BUILTIN_TEMPLATES: Dict[str, ProjectTemplate] = {
+BUILTIN_TEMPLATES: dict[str, ProjectTemplate] = {
     # Web Development
     "web-app": ProjectTemplate(
         id="web-app",
@@ -304,7 +304,7 @@ class ProjectTemplateLibrary:
 
     def __init__(self, memory=None):
         self.memory = memory
-        self.templates: Dict[str, ProjectTemplate] = dict(BUILTIN_TEMPLATES)
+        self.templates: dict[str, ProjectTemplate] = dict(BUILTIN_TEMPLATES)
         self._load_custom_templates()
 
     def _load_custom_templates(self):
@@ -350,7 +350,7 @@ class ProjectTemplateLibrary:
             return "No templates found."
 
         # Group by category
-        by_category: Dict[str, List[ProjectTemplate]] = {}
+        by_category: dict[str, list[ProjectTemplate]] = {}
         for t in templates:
             if t.category not in by_category:
                 by_category[t.category] = []
@@ -413,7 +413,7 @@ class ProjectTemplateLibrary:
         self,
         template_id: str,
         customization: str = ""
-    ) -> Optional[Dict]:
+    ) -> Optional[dict]:
         """
         Create project configuration from a template.
         Returns a dict suitable for GDIL project creation.
@@ -459,11 +459,11 @@ class ProjectTemplateLibrary:
             return True
         return False
 
-    def get_categories(self) -> List[str]:
+    def get_categories(self) -> list[str]:
         """Get list of all template categories."""
-        return sorted(set(t.category for t in self.templates.values()))
+        return sorted({t.category for t in self.templates.values()})
 
-    def search_templates(self, query: str) -> List[ProjectTemplate]:
+    def search_templates(self, query: str) -> list[ProjectTemplate]:
         """Search templates by keyword."""
         query_lower = query.lower()
         results = []

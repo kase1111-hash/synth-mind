@@ -9,18 +9,17 @@ Provides security event reporting to Boundary SIEM for:
 - Cognitive events (project creation, tool execution)
 """
 
-import asyncio
+import hashlib
 import json
 import logging
 import socket
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import IntEnum
-from typing import Optional, Dict, Any, List
 from queue import Queue
-from threading import Thread, Lock
-import hashlib
+from threading import Lock, Thread
+from typing import Any, Optional
 
 try:
     import aiohttp
@@ -81,8 +80,8 @@ class SecurityEvent:
 
     # Additional context
     message: Optional[str] = None
-    details: Dict[str, Any] = field(default_factory=dict)
-    tags: List[str] = field(default_factory=list)
+    details: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
 
     # Error information
     error_code: Optional[str] = None
@@ -95,7 +94,7 @@ class SecurityEvent:
             content = f"{self.timestamp}{self.action}{self.source_host}"
             self.event_id = hashlib.sha256(content.encode()).hexdigest()[:16]
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         """Convert to JSON format for HTTP API."""
         return {
             "timestamp": self.timestamp,
@@ -184,7 +183,7 @@ class SIEMConfig:
 
     # Filtering
     min_severity: int = Severity.LOW
-    enabled_categories: List[str] = field(default_factory=lambda: [
+    enabled_categories: list[str] = field(default_factory=lambda: [
         EventCategory.AUTHENTICATION,
         EventCategory.AUTHORIZATION,
         EventCategory.SECURITY,
@@ -210,7 +209,7 @@ class BoundarySIEM:
     def __init__(self, config: Optional[SIEMConfig] = None):
         self.config = config or SIEMConfig()
         self._event_queue: Queue = Queue()
-        self._batch: List[SecurityEvent] = []
+        self._batch: list[SecurityEvent] = []
         self._batch_lock = Lock()
         self._running = False
         self._worker_thread: Optional[Thread] = None
@@ -341,7 +340,7 @@ class BoundarySIEM:
         description: str,
         ip_address: Optional[str] = None,
         username: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
     ):
         """Report a security violation (injection, tampering, etc.)."""
         event = SecurityEvent(
@@ -363,7 +362,7 @@ class BoundarySIEM:
         error_message: str,
         error_code: Optional[str] = None,
         severity: int = Severity.MEDIUM,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
     ):
         """Report a system or application error."""
         event = SecurityEvent(
@@ -384,7 +383,7 @@ class BoundarySIEM:
         action: str,
         message: str,
         severity: int = Severity.LOW,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
     ):
         """Report a system event (startup, shutdown, config change)."""
         event = SecurityEvent(
@@ -402,7 +401,7 @@ class BoundarySIEM:
         self,
         action: str,
         outcome: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
     ):
         """Report a cognitive/AI event (tool use, project action)."""
         event = SecurityEvent(
@@ -469,7 +468,7 @@ class BoundarySIEM:
         if self.config.cef_enabled and self._cef_socket:
             self._send_cef(event)
 
-    def _send_batch_http(self, events: List[SecurityEvent]):
+    def _send_batch_http(self, events: list[SecurityEvent]):
         """Send events via HTTP API."""
         if not events:
             return
@@ -486,8 +485,8 @@ class BoundarySIEM:
 
             for attempt in range(self.config.max_retries):
                 try:
-                    import urllib.request
                     import urllib.error
+                    import urllib.request
 
                     req = urllib.request.Request(
                         f"{self.config.api_url}/api/v1/events",
@@ -540,7 +539,7 @@ class BoundarySIEM:
             # Try to reconnect
             self._connect_cef()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get client statistics."""
         return {
             **self._stats,

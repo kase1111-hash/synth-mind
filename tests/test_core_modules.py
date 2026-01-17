@@ -3,12 +3,13 @@ Unit tests for core modules.
 Tests LLM wrapper, memory system, and tool manager.
 """
 
-import sys
-import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-import tempfile
 import os
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -24,7 +25,7 @@ class TestLLMWrapper:
     def test_detect_provider_anthropic(self):
         """Test provider detection for Anthropic."""
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True):
-            from core.llm_wrapper import LLMWrapper, LLMProvider
+            from core.llm_wrapper import LLMProvider, LLMWrapper
 
             # Need to reimport to pick up new env
             wrapper = LLMWrapper.__new__(LLMWrapper)
@@ -35,7 +36,7 @@ class TestLLMWrapper:
     def test_detect_provider_openai(self):
         """Test provider detection for OpenAI."""
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True):
-            from core.llm_wrapper import LLMWrapper, LLMProvider
+            from core.llm_wrapper import LLMProvider, LLMWrapper
 
             wrapper = LLMWrapper.__new__(LLMWrapper)
             provider = wrapper._detect_provider()
@@ -45,7 +46,7 @@ class TestLLMWrapper:
     def test_detect_provider_ollama(self):
         """Test provider detection for Ollama."""
         with patch.dict(os.environ, {"OLLAMA_MODEL": "llama3.2"}, clear=True):
-            from core.llm_wrapper import LLMWrapper, LLMProvider
+            from core.llm_wrapper import LLMProvider, LLMWrapper
 
             wrapper = LLMWrapper.__new__(LLMWrapper)
             provider = wrapper._detect_provider()
@@ -214,6 +215,7 @@ class TestCoreIntegration:
 
             def get_embedding(self, text):
                 import hashlib
+
                 import numpy as np
                 hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
                 np.random.seed(hash_val % (2**32))
@@ -232,7 +234,7 @@ class TestCoreIntegration:
         assert len(tools) >= 5
 
         # Each tool should have required fields
-        for name, info in tools.items():
+        for _name, info in tools.items():
             assert "description" in info
             assert "params" in info
 

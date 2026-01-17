@@ -9,13 +9,14 @@ Key principles:
 4. Local learning combined with distributed knowledge
 """
 
-import time
-import json
 import hashlib
+import json
 import random
-from typing import List, Dict, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
+import time
 from collections import defaultdict
+from dataclasses import asdict, dataclass
+from typing import Any, Optional
+
 import numpy as np
 
 try:
@@ -30,11 +31,11 @@ class SharedPattern:
     """A learnable pattern that can be shared across peers."""
     pattern_type: str  # 'resolution', 'intent', 'calibration'
     pattern_hash: str  # Hash of the pattern (not raw content)
-    pattern_embedding: List[float]  # Anonymized embedding
+    pattern_embedding: list[float]  # Anonymized embedding
     success_rate: float  # 0-1 effectiveness
     confidence: float  # 0-1 certainty
     sample_count: int  # Number of observations (k-anonymity)
-    metadata: Dict[str, Any]  # Non-identifying metadata
+    metadata: dict[str, Any]  # Non-identifying metadata
     timestamp: float
 
 
@@ -42,7 +43,7 @@ class SharedPattern:
 class FederatedUpdate:
     """An update to be shared or received from peers."""
     sender_id: str  # Anonymized sender identifier
-    patterns: List[SharedPattern]
+    patterns: list[SharedPattern]
     aggregation_round: int
     signature: str  # Simple integrity check
 
@@ -75,7 +76,7 @@ class PrivacyFilter:
 
         return True
 
-    def add_differential_noise(self, embedding: List[float]) -> List[float]:
+    def add_differential_noise(self, embedding: list[float]) -> list[float]:
         """Add calibrated noise for differential privacy."""
         noise = np.random.laplace(0, self.noise_scale / self.epsilon, len(embedding))
         noisy = np.array(embedding) + noise
@@ -119,15 +120,15 @@ class PatternAggregator:
 
     def __init__(self, similarity_threshold: float = 0.7):
         self.similarity_threshold = similarity_threshold
-        self.pattern_buffer: Dict[str, List[SharedPattern]] = defaultdict(list)
+        self.pattern_buffer: dict[str, list[SharedPattern]] = defaultdict(list)
 
-    def add_patterns(self, patterns: List[SharedPattern], source_weight: float = 1.0):
+    def add_patterns(self, patterns: list[SharedPattern], source_weight: float = 1.0):
         """Add patterns from a peer to the aggregation buffer."""
         for pattern in patterns:
             # Group by pattern hash
             self.pattern_buffer[pattern.pattern_hash].append(pattern)
 
-    def aggregate(self) -> List[SharedPattern]:
+    def aggregate(self) -> list[SharedPattern]:
         """
         Aggregate buffered patterns using federated averaging.
         Returns consensus patterns that multiple peers agree on.
@@ -199,11 +200,13 @@ class FederatedLearningLayer:
         memory,
         llm,
         node_id: Optional[str] = None,
-        peer_endpoints: List[str] = [],
+        peer_endpoints: list[str] = None,
         privacy_epsilon: float = 1.0,
         k_anonymity: int = 5,
         sync_interval_minutes: int = 30
     ):
+        if peer_endpoints is None:
+            peer_endpoints = []
         self.memory = memory
         self.llm = llm
         self.node_id = node_id or self._generate_node_id()
@@ -220,8 +223,8 @@ class FederatedLearningLayer:
         self.aggregation_round = 0
 
         # Local pattern storage
-        self.local_patterns: Dict[str, SharedPattern] = {}
-        self.received_patterns: Dict[str, SharedPattern] = {}
+        self.local_patterns: dict[str, SharedPattern] = {}
+        self.received_patterns: dict[str, SharedPattern] = {}
 
         # Stats
         self.stats = {
@@ -242,7 +245,7 @@ class FederatedLearningLayer:
         salt = "synth_mind_federated_v1"
         return hashlib.sha256(f"{salt}:{content}".encode()).hexdigest()[:32]
 
-    async def extract_shareable_patterns(self) -> List[SharedPattern]:
+    async def extract_shareable_patterns(self) -> list[SharedPattern]:
         """
         Extract patterns from local memory that can be shared.
         Focuses on uncertainty resolution patterns.
@@ -252,11 +255,11 @@ class FederatedLearningLayer:
         # Get uncertainty logs that were resolved
         try:
             logs = self.memory.get_uncertainty_logs(limit=200, unresolved_only=False)
-        except:
+        except Exception:
             return []
 
         # Group by resolution pattern
-        resolution_groups: Dict[str, List[Dict]] = defaultdict(list)
+        resolution_groups: dict[str, list[dict]] = defaultdict(list)
         for log in logs:
             if log.get("resolved") and log.get("resolution_pattern"):
                 resolution_groups[log["resolution_pattern"]].append(log)
@@ -267,7 +270,7 @@ class FederatedLearningLayer:
                 continue
 
             # Calculate success metrics
-            avg_confidence = sum(l["confidence_score"] for l in group) / len(group)
+            avg_confidence = sum(entry["confidence_score"] for entry in group) / len(group)
 
             # Create embedding from resolution pattern (anonymized)
             if hasattr(self.memory, 'embed'):
@@ -295,7 +298,7 @@ class FederatedLearningLayer:
 
         return patterns
 
-    def _hash_to_embedding(self, text: str, dim: int = 384) -> List[float]:
+    def _hash_to_embedding(self, text: str, dim: int = 384) -> list[float]:
         """Fallback: create pseudo-embedding from hash."""
         hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
         np.random.seed(hash_val % (2**32))
@@ -338,7 +341,7 @@ class FederatedLearningLayer:
 
         return False
 
-    async def receive_update(self, update_data: Dict) -> Dict:
+    async def receive_update(self, update_data: dict) -> dict:
         """
         Receive and process an update from a peer.
         Returns acknowledgment with local patterns.
@@ -391,12 +394,12 @@ class FederatedLearningLayer:
 
         return True
 
-    def _sign_update(self, patterns: List[SharedPattern]) -> str:
+    def _sign_update(self, patterns: list[SharedPattern]) -> str:
         """Create simple integrity signature."""
         content = json.dumps([asdict(p) for p in patterns], sort_keys=True)
         return hashlib.sha256(f"{self.node_id}:{content}".encode()).hexdigest()[:16]
 
-    async def sync_round(self) -> Dict:
+    async def sync_round(self) -> dict:
         """
         Perform a full synchronization round with all peers.
         """
@@ -426,7 +429,7 @@ class FederatedLearningLayer:
 
         return results
 
-    async def _apply_aggregated_patterns(self, patterns: List[SharedPattern]):
+    async def _apply_aggregated_patterns(self, patterns: list[SharedPattern]):
         """
         Apply aggregated patterns to improve local knowledge.
         Uses consensus patterns to enhance uncertainty resolution.
@@ -449,7 +452,7 @@ class FederatedLearningLayer:
                             "source": "peer_aggregation"
                         }
                     )
-                except:
+                except Exception:
                     pass
 
     def should_sync(self) -> bool:
@@ -461,7 +464,7 @@ class FederatedLearningLayer:
         if self.should_sync() and self.peers:
             await self.sync_round()
 
-    def get_pattern_similarity(self, text: str) -> List[Tuple[SharedPattern, float]]:
+    def get_pattern_similarity(self, text: str) -> list[tuple[SharedPattern, float]]:
         """
         Find patterns similar to given text.
         Used to enhance local decision making.
@@ -484,7 +487,7 @@ class FederatedLearningLayer:
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:5]
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get federated learning statistics."""
         return {
             **self.stats,

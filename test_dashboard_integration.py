@@ -13,8 +13,8 @@ print("TEST 1: Dashboard Dependencies")
 print("=" * 60)
 
 try:
-    from aiohttp import web
-    import aiohttp_cors
+    import aiohttp_cors  # noqa: F401
+    from aiohttp import web  # noqa: F401
     print("✓ aiohttp installed")
     print("✓ aiohttp-cors installed")
 except ImportError as e:
@@ -48,7 +48,7 @@ print("\n" + "=" * 60)
 print("TEST 3: Python Syntax")
 print("=" * 60)
 
-import py_compile
+import py_compile  # noqa: E402
 
 try:
     py_compile.compile("dashboard/run_synth_with_dashboard.py", doraise=True)
@@ -76,14 +76,14 @@ dashboard_dir = original_dir / "dashboard"
 sys.path.insert(0, str(original_dir))
 
 try:
-    from core.orchestrator import SynthOrchestrator
+    from core.orchestrator import SynthOrchestrator  # noqa: F401
     print("✓ Can import SynthOrchestrator from dashboard context")
 except ImportError as e:
     print(f"✗ Import failed: {e}")
     sys.exit(1)
 
 try:
-    from utils.logging import setup_logging
+    from utils.logging import setup_logging  # noqa: F401
     print("✓ Can import setup_logging")
 except ImportError as e:
     print(f"✗ Import failed: {e}")
