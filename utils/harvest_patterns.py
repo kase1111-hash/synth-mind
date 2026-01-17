@@ -17,10 +17,10 @@ import json
 import sqlite3
 import sys
 import time
-from pathlib import Path
-from typing import Dict, List, Optional
 from collections import Counter
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 # Add parent directory for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -36,7 +36,7 @@ def get_db_connection(db_path: str = "state/memory.db") -> sqlite3.Connection:
     return sqlite3.connect(path)
 
 
-def get_uncertainty_stats(db: sqlite3.Connection) -> Dict:
+def get_uncertainty_stats(db: sqlite3.Connection) -> dict:
     """Get statistics about uncertainty logs."""
     cursor = db.cursor()
 
@@ -99,7 +99,7 @@ def get_uncertainty_logs(
     db: sqlite3.Connection,
     limit: int = 500,
     unresolved_only: bool = False
-) -> List[Dict]:
+) -> list[dict]:
     """Retrieve uncertainty logs for analysis."""
     cursor = db.cursor()
 
@@ -133,7 +133,7 @@ def get_uncertainty_logs(
     return results
 
 
-def analyze_patterns_simple(logs: List[Dict]) -> Dict:
+def analyze_patterns_simple(logs: list[dict]) -> dict:
     """
     Simple pattern analysis without LLM.
     Identifies common words, phrases, and signal patterns.
@@ -176,15 +176,16 @@ def analyze_patterns_simple(logs: List[Dict]) -> Dict:
     }
 
 
-def analyze_patterns_llm(logs: List[Dict], llm_provider: str = "anthropic") -> Optional[Dict]:
+def analyze_patterns_llm(logs: list[dict], llm_provider: str = "anthropic") -> Optional[dict]:
     """
     LLM-powered pattern analysis.
     Requires API key to be set.
     """
     try:
         if llm_provider == "anthropic":
-            import anthropic
             import os
+
+            import anthropic
             client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
             # Prepare log summary
@@ -243,7 +244,7 @@ Output as JSON:
     return None
 
 
-def export_patterns(patterns: Dict, output_path: str):
+def export_patterns(patterns: dict, output_path: str):
     """Export patterns to YAML file."""
     try:
         import yaml
@@ -258,7 +259,7 @@ def export_patterns(patterns: Dict, output_path: str):
         print(f"✅ Patterns exported to {json_path} (YAML not available)")
 
 
-def print_stats(stats: Dict):
+def print_stats(stats: dict):
     """Pretty print statistics."""
     print("\n" + "=" * 60)
     print("📊 UNCERTAINTY LOG STATISTICS")
@@ -288,7 +289,7 @@ def print_stats(stats: Dict):
     print("=" * 60)
 
 
-def print_simple_analysis(analysis: Dict):
+def print_simple_analysis(analysis: dict):
     """Pretty print simple analysis results."""
     print("\n" + "=" * 60)
     print("🔍 PATTERN ANALYSIS (Simple)")

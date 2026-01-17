@@ -12,24 +12,19 @@ Provides:
 import asyncio
 import functools
 import logging
-import sys
-import traceback
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import (
-    Any, Callable, Dict, List, Optional, Type, TypeVar, Union,
-    Awaitable, Tuple
-)
-import re
+from typing import Any, Callable, Optional, TypeVar
 
-from .boundary_siem import (
-    get_siem, SecurityEvent, Severity, EventCategory
-)
 from .boundary_daemon import (
-    get_daemon, PolicyResponse, PolicyDecision, PolicyQuery,
-    ResourceType, BoundaryMode
+    PolicyDecision,
+    PolicyQuery,
+    ResourceType,
+    get_daemon,
 )
+from .boundary_siem import Severity, get_siem
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +71,7 @@ class ErrorContext:
     session_id: Optional[str] = None
     request_id: Optional[str] = None
     resource: Optional[str] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -92,7 +87,7 @@ class HandledError:
     recoverable: bool = True
     reported: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "category": self.category.value,
             "severity": self.severity.name,
@@ -129,7 +124,7 @@ class SecurityViolationError(Exception):
         self,
         violation_type: str,
         message: str,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ):
         super().__init__(message)
         self.violation_type = violation_type
@@ -160,8 +155,8 @@ class ErrorHandler:
     """
 
     def __init__(self):
-        self._error_counts: Dict[str, int] = {}
-        self._recent_errors: List[HandledError] = []
+        self._error_counts: dict[str, int] = {}
+        self._recent_errors: list[HandledError] = []
         self._max_recent = 100
         self._violation_count = 0
         self._lockdown_threshold = 5  # Violations before lockdown
@@ -218,7 +213,7 @@ class ErrorHandler:
 
         return handled
 
-    def _categorize_error(self, error: Exception) -> Tuple[ErrorCategory, ErrorSeverity]:
+    def _categorize_error(self, error: Exception) -> tuple[ErrorCategory, ErrorSeverity]:
         """Categorize an error based on its type and message."""
         error_type = type(error).__name__
         error_msg = str(error).lower()
@@ -284,7 +279,7 @@ class ErrorHandler:
 
         # Check context details if available
         if context and context.details:
-            for key, value in context.details.items():
+            for _key, value in context.details.items():
                 if isinstance(value, str):
                     for pattern, violation_type in SECURITY_PATTERNS:
                         if re.search(pattern, value):
@@ -415,7 +410,7 @@ class ErrorHandler:
         else:
             logger.info(log_msg)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get error statistics."""
         return {
             "error_counts": dict(self._error_counts),
@@ -424,7 +419,7 @@ class ErrorHandler:
             "lockdown_threshold": self._lockdown_threshold,
         }
 
-    def get_recent_errors(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_errors(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent errors."""
         return [e.to_dict() for e in self._recent_errors[-limit:]]
 
@@ -579,7 +574,7 @@ def with_retry(
     max_attempts: int = 3,
     delay: float = 1.0,
     backoff: float = 2.0,
-    exceptions: Tuple[Type[Exception], ...] = (Exception,)
+    exceptions: tuple[type[Exception], ...] = (Exception,)
 ):
     """
     Decorator for automatic retry with exponential backoff.

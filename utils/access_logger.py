@@ -6,14 +6,13 @@ Provides HTTP access logging with support for multiple formats and destinations.
 
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Optional
 
 
 class LogFormat(Enum):
@@ -110,11 +109,11 @@ class AccessLogger:
             stdout_handler.setFormatter(logging.Formatter('%(message)s'))
             self._logger.addHandler(stdout_handler)
 
-    def _format_json(self, entry: Dict[str, Any]) -> str:
+    def _format_json(self, entry: dict[str, Any]) -> str:
         """Format log entry as JSON."""
         return json.dumps(entry, default=str)
 
-    def _format_common(self, entry: Dict[str, Any]) -> str:
+    def _format_common(self, entry: dict[str, Any]) -> str:
         """
         Format log entry in Apache Common Log Format.
         Format: host ident authuser date request status bytes
@@ -131,7 +130,7 @@ class AccessLogger:
 
         return f'{host} {ident} {authuser} {date} "{request}" {status} {bytes_sent}'
 
-    def _format_combined(self, entry: Dict[str, Any]) -> str:
+    def _format_combined(self, entry: dict[str, Any]) -> str:
         """
         Format log entry in Apache Combined Log Format.
         Extends Common format with referer and user-agent.
@@ -142,7 +141,7 @@ class AccessLogger:
 
         return f'{common} "{referer}" "{user_agent}"'
 
-    def _format_simple(self, entry: Dict[str, Any]) -> str:
+    def _format_simple(self, entry: dict[str, Any]) -> str:
         """Format log entry in simple human-readable format."""
         timestamp = entry.get("timestamp", "")[:19]  # Trim to seconds
         method = entry.get("method", "GET")
@@ -154,7 +153,7 @@ class AccessLogger:
 
         return f"{timestamp} | {method:6} | {status} | {duration_ms:6.1f}ms | {client_ip:15} | {user:15} | {path}"
 
-    def _redact_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
+    def _redact_headers(self, headers: dict[str, str]) -> dict[str, str]:
         """Redact sensitive headers."""
         if not headers:
             return {}
@@ -177,10 +176,10 @@ class AccessLogger:
         user: Optional[str] = None,
         user_agent: Optional[str] = None,
         referer: Optional[str] = None,
-        request_headers: Optional[Dict[str, str]] = None,
-        response_headers: Optional[Dict[str, str]] = None,
+        request_headers: Optional[dict[str, str]] = None,
+        response_headers: Optional[dict[str, str]] = None,
         response_size: Optional[int] = None,
-        extra: Optional[Dict[str, Any]] = None
+        extra: Optional[dict[str, Any]] = None
     ):
         """
         Log an HTTP request.
@@ -251,7 +250,7 @@ class AccessLogger:
         # Write log
         self._logger.info(log_line)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get logging statistics."""
         stats = {
             "enabled": self.config.enabled,
@@ -369,7 +368,7 @@ if __name__ == "__main__":
             sys.exit(1)
 
         size = log_path.stat().st_size
-        line_count = sum(1 for _ in open(log_path, 'r'))
+        line_count = sum(1 for _ in open(log_path))
 
         print(f"Log file: {log_path}")
         print(f"Size: {size / 1024:.2f} KB ({size / (1024*1024):.2f} MB)")
@@ -380,7 +379,7 @@ if __name__ == "__main__":
             status_counts = {}
             method_counts = {}
             try:
-                with open(log_path, 'r') as f:
+                with open(log_path) as f:
                     for line in f:
                         try:
                             entry = json.loads(line.strip())
@@ -407,7 +406,7 @@ if __name__ == "__main__":
             print(f"Log file not found: {log_path}")
             sys.exit(1)
 
-        with open(log_path, 'r') as f:
+        with open(log_path) as f:
             lines = f.readlines()
             for line in lines[-args.tail:]:
                 print(line.rstrip())

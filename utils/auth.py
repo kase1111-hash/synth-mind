@@ -4,22 +4,22 @@ Provides secure token-based authentication for production deployment.
 """
 
 import hashlib
-import secrets
 import json
 import os
+import secrets
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Optional, Dict, Tuple
-from dataclasses import dataclass, field, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Optional
 
 try:
     import jwt
-except ImportError:
+except ImportError as err:
     raise ImportError(
         "PyJWT is required for authentication. "
         "Install it with: pip install PyJWT"
-    )
+    ) from err
 
 
 class UserRole(Enum):
@@ -93,7 +93,7 @@ class AuthManager:
         self.secret_key = secret_key or self._load_or_create_secret()
 
         # Load users
-        self.users: Dict[str, User] = {}
+        self.users: dict[str, User] = {}
         self._load_users()
 
         # Token blacklist (for logout) - now persisted to disk
@@ -103,7 +103,7 @@ class AuthManager:
     def _load_or_create_secret(self) -> str:
         """Load existing secret key or create new one."""
         if self.config_file.exists():
-            with open(self.config_file, 'r') as f:
+            with open(self.config_file) as f:
                 config = json.load(f)
                 return config.get("secret_key", secrets.token_hex(32))
 
@@ -121,7 +121,7 @@ class AuthManager:
     def _load_users(self):
         """Load users from storage."""
         if self.users_file.exists():
-            with open(self.users_file, 'r') as f:
+            with open(self.users_file) as f:
                 data = json.load(f)
                 self.users = {
                     username: User.from_dict(user_data)
@@ -139,7 +139,7 @@ class AuthManager:
         """Load token blacklist from storage and clean expired tokens."""
         if self.blacklist_file.exists():
             try:
-                with open(self.blacklist_file, 'r') as f:
+                with open(self.blacklist_file) as f:
                     data = json.load(f)
                     # Load tokens with their expiration times
                     now = datetime.now().timestamp()
@@ -171,7 +171,7 @@ class AuthManager:
             json.dump(data, f, indent=2)
         os.chmod(self.blacklist_file, 0o600)  # Secure permissions
 
-    def _hash_password(self, password: str, salt: Optional[str] = None) -> Tuple[str, str]:
+    def _hash_password(self, password: str, salt: Optional[str] = None) -> tuple[str, str]:
         """
         Hash password with salt using PBKDF2.
 
@@ -198,7 +198,7 @@ class AuthManager:
 
     # User Management
 
-    def create_user(self, username: str, password: str, role: UserRole = UserRole.VIEWER) -> Tuple[bool, str]:
+    def create_user(self, username: str, password: str, role: UserRole = UserRole.VIEWER) -> tuple[bool, str]:
         """
         Create a new user account.
 
@@ -223,7 +223,7 @@ class AuthManager:
 
         return True, f"User '{username}' created successfully"
 
-    def delete_user(self, username: str) -> Tuple[bool, str]:
+    def delete_user(self, username: str) -> tuple[bool, str]:
         """Delete a user account."""
         if username not in self.users:
             return False, "User not found"
@@ -233,7 +233,7 @@ class AuthManager:
 
         return True, f"User '{username}' deleted"
 
-    def update_password(self, username: str, new_password: str) -> Tuple[bool, str]:
+    def update_password(self, username: str, new_password: str) -> tuple[bool, str]:
         """Update user password."""
         if username not in self.users:
             return False, "User not found"
@@ -248,7 +248,7 @@ class AuthManager:
 
         return True, "Password updated"
 
-    def update_role(self, username: str, new_role: UserRole) -> Tuple[bool, str]:
+    def update_role(self, username: str, new_role: UserRole) -> tuple[bool, str]:
         """Update user role."""
         if username not in self.users:
             return False, "User not found"
@@ -277,7 +277,7 @@ class AuthManager:
 
     # Authentication
 
-    def authenticate(self, username: str, password: str) -> Tuple[bool, Optional[Dict]]:
+    def authenticate(self, username: str, password: str) -> tuple[bool, Optional[dict]]:
         """
         Authenticate user credentials.
 
@@ -337,7 +337,7 @@ class AuthManager:
         }
         return jwt.encode(payload, self.secret_key, algorithm="HS256")
 
-    def validate_token(self, token: str, token_type: str = "access") -> Tuple[bool, Optional[Dict]]:
+    def validate_token(self, token: str, token_type: str = "access") -> tuple[bool, Optional[dict]]:
         """
         Validate JWT token.
 
@@ -365,7 +365,7 @@ class AuthManager:
         except jwt.InvalidTokenError:
             return False, None
 
-    def refresh_access_token(self, refresh_token: str) -> Tuple[bool, Optional[Dict]]:
+    def refresh_access_token(self, refresh_token: str) -> tuple[bool, Optional[dict]]:
         """
         Generate new access token from refresh token.
 
@@ -396,7 +396,7 @@ class AuthManager:
 
     # Permission Checking
 
-    def check_permission(self, token: str, required_role: UserRole) -> Tuple[bool, Optional[str]]:
+    def check_permission(self, token: str, required_role: UserRole) -> tuple[bool, Optional[str]]:
         """
         Check if token has required permission level.
 
@@ -424,7 +424,7 @@ class AuthManager:
 
     # Initial Setup
 
-    def setup_initial_admin(self, username: str, password: str) -> Tuple[bool, str]:
+    def setup_initial_admin(self, username: str, password: str) -> tuple[bool, str]:
         """
         Create initial admin user (only works if no admin exists).
 

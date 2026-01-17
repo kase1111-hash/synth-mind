@@ -9,42 +9,41 @@ import asyncio
 import json
 import ssl
 import sys
-from pathlib import Path
-from typing import Set, Optional
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from aiohttp import web
     import aiohttp_cors
-except ImportError:
+    from aiohttp import web
+except ImportError as err:
     raise ImportError(
         "aiohttp and aiohttp-cors are required for the dashboard server. "
         "Install them with: pip install aiohttp aiohttp-cors"
-    )
+    ) from err
 
 from core.orchestrator import SynthOrchestrator
+from utils.access_logger import (
+    AccessLogConfig,
+    AccessLogger,
+    LogFormat,
+    create_access_log_middleware,
+)
 from utils.auth import AuthManager, UserRole
-from utils.rate_limiter import RateLimiter, RateLimitConfig, create_rate_limit_middleware
-from utils.access_logger import AccessLogger, AccessLogConfig, LogFormat, create_access_log_middleware
-from utils.ip_firewall import IPFirewall, FirewallConfig, FirewallMode, create_firewall_middleware
+from utils.ip_firewall import FirewallConfig, FirewallMode, IPFirewall, create_firewall_middleware
 from utils.prometheus_metrics import get_metrics
+from utils.rate_limiter import RateLimitConfig, RateLimiter, create_rate_limit_middleware
 
 # Security integration - Boundary SIEM and Daemon
 try:
     from security import (
-        init_security,
-        SecurityConfig,
-        get_siem,
-        get_daemon,
-        BoundaryMode,
         PolicyDecision,
         ResourceType,
-        Severity,
-        with_error_handling,
-        check_input_security,
+        SecurityConfig,
+        init_security,
     )
     SECURITY_AVAILABLE = True
 except ImportError:
@@ -103,7 +102,7 @@ class DashboardServer:
         self.orchestrator = orchestrator
         self.port = port
         self.auth_enabled = auth_enabled
-        self.websockets: Set[web.WebSocketResponse] = set()
+        self.websockets: set[web.WebSocketResponse] = set()
         self.state_cache = {}
 
         # SSL/TLS configuration
@@ -201,7 +200,7 @@ class DashboardServer:
             ssl_context.load_cert_chain(cert_path, key_path)
             ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
             return ssl_context
-        
+
     def _setup_routes(self):
         """Setup HTTP and WebSocket routes."""
         # Core dashboard routes
@@ -284,7 +283,7 @@ class DashboardServer:
         cors = aiohttp_cors.setup(self.app, defaults=cors_config)
         for route in list(self.app.router.routes()):
             cors.add(route)
-    
+
     async def serve_dashboard(self, request):
         """Serve the HTML dashboard."""
         dashboard_path = Path(__file__).parent / 'dashboard.html'
@@ -431,12 +430,12 @@ class DashboardServer:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         self.websockets.add(ws)
-        
+
         print(f"Dashboard connected: {len(self.websockets)} active connections")
-        
+
         # Send initial state
         await self.send_state_update(ws)
-        
+
         try:
             async for msg in ws:
                 if msg.type == web.WSMsgType.TEXT:
@@ -447,36 +446,36 @@ class DashboardServer:
         finally:
             self.websockets.remove(ws)
             print(f"Dashboard disconnected: {len(self.websockets)} active connections")
-        
+
         return ws
-    
+
     async def handle_command(self, ws: web.WebSocketResponse, data: dict):
         """Handle commands from dashboard."""
         command = data.get('command')
-        
+
         if command == 'simulate_turn':
             await self.simulate_turn(None)
         elif command == 'trigger_reflection':
             await self.trigger_reflection(None)
         elif command == 'get_state':
             await self.send_state_update(ws)
-    
+
     async def get_state(self, request):
         """HTTP endpoint to get current state."""
         state = self.gather_state()
         return web.json_response(state)
-    
+
     async def simulate_turn(self, request):
         """Simulate a conversation turn."""
         test_input = "This is a simulated user input for testing."
         await self.orchestrator._process_turn(test_input)
-        
+
         # Broadcast updated state
         await self.broadcast_state()
-        
+
         if request:
             return web.json_response({"success": True})
-    
+
     async def trigger_reflection(self, request):
         """Force meta-reflection."""
         result = self.orchestrator.reflection.run_cycle(
@@ -1450,7 +1449,7 @@ class DashboardServer:
                 user_role = UserRole(role)
             except ValueError:
                 return web.json_response(
-                    {"error": f"Invalid role. Must be: admin, operator, or viewer"},
+                    {"error": "Invalid role. Must be: admin, operator, or viewer"},
                     status=400
                 )
 
@@ -1568,7 +1567,7 @@ class DashboardServer:
                 user_role = UserRole(role)
             except ValueError:
                 return web.json_response(
-                    {"error": f"Invalid role. Must be: admin, operator, or viewer"},
+                    {"error": "Invalid role. Must be: admin, operator, or viewer"},
                     status=400
                 )
 
@@ -1601,7 +1600,7 @@ class DashboardServer:
             "persistence": self.orchestrator.calibration.persistence_factor,
             "rejection_threshold": self.orchestrator.calibration.rejection_threshold
         }
-        
+
         # Determine flow state
         difficulty = self.orchestrator.calibration.difficulty_moving_avg
         if difficulty < 0.4:
@@ -1610,15 +1609,15 @@ class DashboardServer:
             flow_state = "overloaded"
         else:
             flow_state = "flow"
-        
+
         state = {
             "timestamp": datetime.now().isoformat(),
             "turn_count": self.orchestrator.turn_count,
-            
+
             # Emotional state
             "valence": emotion_state['valence'],
             "mood_tags": emotion_state['tags'],
-            
+
             # Predictive dreaming
             "dream_alignment": self.orchestrator.metrics.last_dream_alignment,
             "dream_buffer_size": len(self.orchestrator.dreaming.dream_buffer),
@@ -1629,29 +1628,29 @@ class DashboardServer:
                 }
                 for d in self.orchestrator.dreaming.dream_buffer[:5]
             ],
-            
+
             # Flow calibration
             "difficulty": calib_state["current_difficulty"],
             "flow_state": flow_state,
             "temperature": calib_state["temperature"],
             "persistence": calib_state["persistence"],
-            
+
             # Assurance
             "uncertainty": self.orchestrator.metrics.avg_uncertainty(n=5),
             "pending_concerns": len(self.orchestrator.assurance.pending_concerns),
             "assurance_success_rate": metrics['assurance_success'],
-            
+
             # Meta-reflection
             "coherence": 0.85 + (self.orchestrator.emotion.current_valence * 0.1),
-            "next_reflection": self.orchestrator.reflection.reflection_interval - 
+            "next_reflection": self.orchestrator.reflection.reflection_interval -
                              (self.orchestrator.turn_count % self.orchestrator.reflection.reflection_interval),
             "total_insights": self.orchestrator.reflection.turn_counter // 10,
-            
+
             # Temporal purpose
             "sessions_completed": self.orchestrator.temporal.purpose_metrics["sessions_completed"],
             "growth_delta": self.orchestrator.temporal.purpose_metrics["growth_delta"],
             "narrative": self.orchestrator.temporal.current_narrative_summary(),
-            
+
             # Performance metrics
             "metrics": {
                 "predictive_alignment": metrics['predictive_alignment'],
@@ -1685,7 +1684,7 @@ class DashboardServer:
             "current_subtask": project.get("current_subtask", {}).get("name", "None") if project.get("current_subtask") else "None",
             "total_projects": len(self.orchestrator.gdil.projects)
         }
-    
+
     async def send_state_update(self, ws: web.WebSocketResponse):
         """Send state update to specific WebSocket."""
         state = self.gather_state()
@@ -1693,18 +1692,18 @@ class DashboardServer:
             "type": "state_update",
             "data": state
         })
-    
+
     async def broadcast_state(self):
         """Broadcast state to all connected WebSockets."""
         if not self.websockets:
             return
-        
+
         state = self.gather_state()
         message = json.dumps({
             "type": "state_update",
             "data": state
         })
-        
+
         # Send to all connected clients
         dead_sockets = set()
         for ws in self.websockets:
@@ -1712,10 +1711,10 @@ class DashboardServer:
                 await ws.send_str(message)
             except Exception:
                 dead_sockets.add(ws)
-        
+
         # Clean up dead connections
         self.websockets -= dead_sockets
-    
+
     def _get_inline_dashboard(self) -> str:
         """Return inline HTML dashboard if file doesn't exist."""
         return """
@@ -1784,18 +1783,18 @@ class DashboardServer:
             // Use WSS for HTTPS, WS for HTTP
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
-            
+
             ws.onopen = () => {
                 document.getElementById('ws-status').textContent = 'Connected';
                 document.getElementById('ws-status').className = 'ws-status';
             };
-            
+
             ws.onclose = () => {
                 document.getElementById('ws-status').textContent = 'Disconnected';
                 document.getElementById('ws-status').className = 'ws-status disconnected';
                 setTimeout(connect, 3000);
             };
-            
+
             ws.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
                 if (msg.type === 'state_update') {
@@ -1803,37 +1802,37 @@ class DashboardServer:
                 }
             };
         }
-        
+
         function updateUI(state) {
-            document.getElementById('valence').textContent = state.valence >= 0 ? 
+            document.getElementById('valence').textContent = state.valence >= 0 ?
                 `+${state.valence.toFixed(2)}` : state.valence.toFixed(2);
             document.getElementById('dream-alignment').textContent = state.dream_alignment.toFixed(2);
             document.getElementById('flow-state').textContent = state.flow_state.toUpperCase();
             document.getElementById('turn-count').textContent = state.turn_count;
             document.getElementById('narrative').textContent = state.narrative;
         }
-        
+
         function simulateTurn() {
             ws.send(JSON.stringify({command: 'simulate_turn'}));
         }
-        
+
         function triggerReflection() {
             ws.send(JSON.stringify({command: 'trigger_reflection'}));
         }
-        
+
         connect();
     </script>
 </body>
 </html>
         """
-    
+
     async def start_background_broadcast(self):
         """Background task to periodically broadcast state."""
         while True:
             await asyncio.sleep(2)  # Broadcast every 2 seconds
             if self.websockets and self.orchestrator.running:
                 await self.broadcast_state()
-    
+
     async def start(self):
         """Start the server with optional HTTPS/WSS support."""
         # Start background broadcaster
@@ -1864,7 +1863,7 @@ class DashboardServer:
         print(f"  Dashboard server running at {protocol}://localhost:{self.port}")
         if self.is_https:
             print(f"  WebSocket endpoint: {ws_protocol}://localhost:{self.port}/ws")
-            print(f"  TLS: ENABLED (TLS 1.2+)")
+            print("  TLS: ENABLED (TLS 1.2+)")
             if self.ssl_cert:
                 print(f"  Certificate: {self.ssl_cert}")
         print(f"{'='*60}")
@@ -1872,68 +1871,68 @@ class DashboardServer:
         # Show authentication status
         if self.auth_enabled and self.auth:
             if self.auth.get_setup_required():
-                print(f"  Authentication: ENABLED (setup required)")
-                print(f"  POST /api/auth/setup to create admin user")
+                print("  Authentication: ENABLED (setup required)")
+                print("  POST /api/auth/setup to create admin user")
             else:
-                print(f"  Authentication: ENABLED")
-                print(f"  POST /api/auth/login to authenticate")
+                print("  Authentication: ENABLED")
+                print("  POST /api/auth/login to authenticate")
         else:
-            print(f"  Authentication: DISABLED")
+            print("  Authentication: DISABLED")
 
         # Show rate limiting status
         if self.rate_limit_enabled and self.rate_limiter:
             config = self.rate_limiter.config
-            print(f"  Rate Limiting: ENABLED")
+            print("  Rate Limiting: ENABLED")
             print(f"    - Auth endpoints: {config.strict_limit}/min")
             print(f"    - API endpoints: {config.standard_limit}/min")
             print(f"    - Read-only: {config.relaxed_limit}/min")
         else:
-            print(f"  Rate Limiting: DISABLED")
+            print("  Rate Limiting: DISABLED")
 
         # Show access logging status
         if self.access_log_enabled and self.access_logger:
             config = self.access_logger.config
-            print(f"  Access Logging: ENABLED")
+            print("  Access Logging: ENABLED")
             print(f"    - Format: {config.format.value}")
             if config.log_to_file:
                 print(f"    - Log file: {config.log_file}")
             if config.log_to_stdout:
-                print(f"    - Stdout: enabled")
+                print("    - Stdout: enabled")
         else:
-            print(f"  Access Logging: DISABLED")
+            print("  Access Logging: DISABLED")
 
         # Show firewall status
         if self.firewall_enabled and self.firewall:
             config = self.firewall.config
-            print(f"  IP Firewall: ENABLED")
+            print("  IP Firewall: ENABLED")
             print(f"    - Mode: {config.mode.value}")
             stats = self.firewall.get_stats()
             print(f"    - Whitelist rules: {stats['whitelist_rules']}")
             print(f"    - Blacklist rules: {stats['blacklist_rules']}")
             print(f"    - Peer IPs: {stats['peer_ips']}")
         else:
-            print(f"  IP Firewall: DISABLED")
+            print("  IP Firewall: DISABLED")
 
         # Show Boundary security integration status
         if self.security_enabled:
-            print(f"  Boundary Security: ENABLED")
+            print("  Boundary Security: ENABLED")
             if self.siem:
-                print(f"    - SIEM: Connected")
+                print("    - SIEM: Connected")
             else:
-                print(f"    - SIEM: Not available")
+                print("    - SIEM: Not available")
             if self.daemon:
                 if self.daemon.is_connected():
                     mode = self.daemon.get_current_mode()
                     print(f"    - Daemon: Connected (mode: {mode.value})")
                 else:
-                    print(f"    - Daemon: Not connected (standalone mode)")
+                    print("    - Daemon: Not connected (standalone mode)")
             else:
-                print(f"    - Daemon: Not available")
+                print("    - Daemon: Not available")
         else:
             if SECURITY_AVAILABLE:
-                print(f"  Boundary Security: DISABLED")
+                print("  Boundary Security: DISABLED")
             else:
-                print(f"  Boundary Security: NOT AVAILABLE (module not installed)")
+                print("  Boundary Security: NOT AVAILABLE (module not installed)")
 
         print(f"{'='*60}\n")
 

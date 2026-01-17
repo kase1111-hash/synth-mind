@@ -19,7 +19,7 @@ import math
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 
 class MandelbrotWeighting:
@@ -52,15 +52,12 @@ class MandelbrotWeighting:
         "there", "when", "where", "why", "how", "all", "each", "few",
         "more", "most", "other", "some", "such", "no", "nor", "not",
         "only", "own", "same", "so", "than", "too", "very", "just",
-        "and", "but", "if", "or", "because", "until", "while", "of",
-        "about", "against", "between", "into", "through", "during",
-        "i", "me", "my", "myself", "we", "our", "ours", "ourselves",
+        "and", "but", "if", "or", "because", "until", "while", "about", "against", "i", "me", "my", "myself", "we", "our", "ours", "ourselves",
         "you", "your", "yours", "yourself", "yourselves", "he", "him",
         "his", "himself", "she", "her", "hers", "herself", "it", "its",
         "itself", "they", "them", "their", "theirs", "themselves",
         "what", "which", "who", "whom", "this", "that", "these", "those",
-        "am", "is", "are", "was", "were", "be", "been", "being",
-        "get", "got", "gets", "getting", "going", "go", "goes", "went"
+        "am", "get", "got", "gets", "getting", "going", "go", "goes", "went"
     }
 
     def __init__(
@@ -102,12 +99,12 @@ class MandelbrotWeighting:
         self.corpus_path = Path(corpus_path) if corpus_path else None
 
         # Cached rankings (rebuilt when corpus changes significantly)
-        self._word_ranks: Dict[str, int] = {}
+        self._word_ranks: dict[str, int] = {}
         self._cache_valid = False
         self._last_corpus_size = 0
 
         # Domain-specific boost words (manually curated high-value terms)
-        self.domain_boost_words: Dict[str, float] = {}
+        self.domain_boost_words: dict[str, float] = {}
 
         # Load existing corpus if available
         if self.corpus_path and self.corpus_path.exists():
@@ -141,7 +138,7 @@ class MandelbrotWeighting:
         # Invalidate cache since parameters changed
         self._cache_valid = False
 
-    def add_domain_boost(self, words: Dict[str, float]):
+    def add_domain_boost(self, words: dict[str, float]):
         """
         Add domain-specific words with manual weight boosts.
 
@@ -150,7 +147,7 @@ class MandelbrotWeighting:
         """
         self.domain_boost_words.update(words)
 
-    def tokenize(self, text: str) -> List[str]:
+    def tokenize(self, text: str) -> list[str]:
         """
         Tokenize text into lowercase words.
 
@@ -179,7 +176,7 @@ class MandelbrotWeighting:
         if self.total_words > self._last_corpus_size * 1.2:
             self._cache_valid = False
 
-    def update_corpus_batch(self, texts: List[str]):
+    def update_corpus_batch(self, texts: list[str]):
         """
         Add multiple texts to the frequency corpus efficiently.
 
@@ -282,7 +279,7 @@ class MandelbrotWeighting:
         # Clamp to bounds
         return max(self.min_weight, min(self.max_weight, weight))
 
-    def weight_words(self, text: str) -> List[Tuple[str, float]]:
+    def weight_words(self, text: str) -> list[tuple[str, float]]:
         """
         Tokenize text and compute weights for all words.
 
@@ -298,7 +295,7 @@ class MandelbrotWeighting:
     def weighted_word_score(
         self,
         text: str,
-        target_words: List[str],
+        target_words: list[str],
         normalize: bool = True
     ) -> float:
         """
@@ -336,8 +333,8 @@ class MandelbrotWeighting:
     def weighted_sentiment_score(
         self,
         text: str,
-        positive_words: List[str],
-        negative_words: List[str]
+        positive_words: list[str],
+        negative_words: list[str]
     ) -> float:
         """
         Compute weighted sentiment score.
@@ -370,7 +367,7 @@ class MandelbrotWeighting:
 
         return (pos_weight - neg_weight) / total
 
-    def get_top_weighted_words(self, text: str, n: int = 10) -> List[Tuple[str, float]]:
+    def get_top_weighted_words(self, text: str, n: int = 10) -> list[tuple[str, float]]:
         """
         Get the top N highest-weighted words from text.
 
@@ -447,7 +444,7 @@ class MandelbrotWeighting:
             return
 
         try:
-            with open(self.corpus_path, 'r') as f:
+            with open(self.corpus_path) as f:
                 data = json.load(f)
 
             self.alpha = data.get("alpha", self.alpha)
@@ -462,7 +459,7 @@ class MandelbrotWeighting:
         except Exception as e:
             print(f"⚠️  Failed to load Mandelbrot corpus: {e}")
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """
         Get statistics about the weighting system.
 
@@ -480,7 +477,7 @@ class MandelbrotWeighting:
             "stopword_count": len(self.stopwords)
         }
 
-    def explain_weight(self, word: str) -> Dict:
+    def explain_weight(self, word: str) -> dict:
         """
         Explain why a word has its weight (for debugging/tuning).
 

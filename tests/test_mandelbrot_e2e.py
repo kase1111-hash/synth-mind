@@ -4,8 +4,8 @@ Tests the utility class, integration with AssuranceResolutionModule,
 and configuration loading.
 """
 
-import sys
 import json
+import sys
 from pathlib import Path
 
 # Add project root to path
@@ -58,7 +58,7 @@ def test_mandelbrot_weighting_class():
 
     score_hedging = mw.weighted_word_score(text_with_hedging, hedge_words)
     score_no_hedging = mw.weighted_word_score(text_without_hedging, hedge_words)
-    print(f"\n  Hedging detection:")
+    print("\n  Hedging detection:")
     print(f"    '{text_with_hedging[:40]}...' → score: {score_hedging:.3f}")
     print(f"    '{text_without_hedging[:40]}...' → score: {score_no_hedging:.3f}")
     assert score_hedging > score_no_hedging, "Hedging text should score higher"
@@ -76,7 +76,7 @@ def test_mandelbrot_weighting_class():
     neg_score = mw.weighted_sentiment_score(neg_text, positive, negative)
     neut_score = mw.weighted_sentiment_score(neutral_text, positive, negative)
 
-    print(f"\n  Sentiment scoring:")
+    print("\n  Sentiment scoring:")
     print(f"    Positive text: {pos_score:.3f}")
     print(f"    Negative text: {neg_score:.3f}")
     print(f"    Neutral text: {neut_score:.3f}")
@@ -88,7 +88,7 @@ def test_mandelbrot_weighting_class():
     mw.add_domain_boost({"ephemeral": 2.0, "critical": 1.8})
     weight_before = mw.compute_weight("storage")
     weight_boosted = mw.compute_weight("ephemeral")
-    print(f"\n  Domain boosts:")
+    print("\n  Domain boosts:")
     print(f"    'storage' (no boost): {weight_before:.3f}")
     print(f"    'ephemeral' (2.0x boost): {weight_boosted:.3f}")
     print("  ✓ Domain boosts applied")
@@ -98,7 +98,7 @@ def test_mandelbrot_weighting_class():
     generic_text = "I want to do the thing with the stuff"
     specific_importance = mw.compute_text_importance(specific_text)
     generic_importance = mw.compute_text_importance(generic_text)
-    print(f"\n  Text importance:")
+    print("\n  Text importance:")
     print(f"    Specific: '{specific_text}' → {specific_importance:.3f}")
     print(f"    Generic: '{generic_text}' → {generic_importance:.3f}")
 
@@ -181,7 +181,7 @@ def test_assurance_module_integration():
     # Confident response
     confident_response = "The database backup will complete in 10 minutes. The storage endpoint is configured correctly."
     uncertainty1, signals1 = module.assess_uncertainty(confident_response, {}, "")
-    print(f"\n  Confident response:")
+    print("\n  Confident response:")
     print(f"    Text: '{confident_response[:50]}...'")
     print(f"    Uncertainty: {uncertainty1:.3f}")
     print(f"    Signals: {json.dumps({k: round(v, 3) for k, v in signals1.items()})}")
@@ -189,7 +189,7 @@ def test_assurance_module_integration():
     # Uncertain response with hedging
     uncertain_response = "Maybe the backup might work, but I'm unsure if it will possibly complete. Perhaps we should try again."
     uncertainty2, signals2 = module.assess_uncertainty(uncertain_response, {}, "")
-    print(f"\n  Uncertain response (with hedging):")
+    print("\n  Uncertain response (with hedging):")
     print(f"    Text: '{uncertain_response[:50]}...'")
     print(f"    Uncertainty: {uncertainty2:.3f}")
     print(f"    Signals: {json.dumps({k: round(v, 3) for k, v in signals2.items()})}")
@@ -200,7 +200,7 @@ def test_assurance_module_integration():
     # Risky response with absolutes
     risky_response = "This will definitely always work. I guarantee it will never fail under any circumstances."
     uncertainty3, signals3 = module.assess_uncertainty(risky_response, {}, "")
-    print(f"\n  Risky response (with absolutes):")
+    print("\n  Risky response (with absolutes):")
     print(f"    Text: '{risky_response[:50]}...'")
     print(f"    Uncertainty: {uncertainty3:.3f}")
     print(f"    Signals: {json.dumps({k: round(v, 3) for k, v in signals3.items()})}")
@@ -260,11 +260,11 @@ def test_config_loading():
         print(f"⚠️  Config file not found: {config_path}")
         return False
 
-    with open(config_path, 'r') as f:
+    with open(config_path) as f:
         config = yaml.safe_load(f)
 
     mandelbrot_config = config.get("mandelbrot_weighting", {})
-    print(f"✓ Loaded mandelbrot_weighting config from personality.yaml")
+    print("✓ Loaded mandelbrot_weighting config from personality.yaml")
     print(f"  Config: {json.dumps(mandelbrot_config, indent=4, default=str)}")
 
     # Validate expected keys
@@ -276,7 +276,7 @@ def test_config_loading():
     # Validate parameter ranges
     assert 0.5 <= mandelbrot_config["alpha"] <= 2.0, "Alpha out of range"
     assert 1.0 <= mandelbrot_config["beta"] <= 10.0, "Beta out of range"
-    print(f"✓ Parameters within valid ranges")
+    print("✓ Parameters within valid ranges")
 
     # Test that domain_boosts is a dict
     assert isinstance(mandelbrot_config["domain_boosts"], dict), "domain_boosts should be dict"
@@ -342,7 +342,7 @@ def test_full_cycle():
         user_message=user_message
     )
 
-    print(f"\n  Cycle results:")
+    print("\n  Cycle results:")
     print(f"    Uncertainty score: {uncertainty:.3f}")
     print(f"    Resolved concerns: {resolved}")
     print(f"    Emotion signals applied: {len(emotion.signals)}")

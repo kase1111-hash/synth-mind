@@ -4,13 +4,11 @@ Enables multiple synth-mind instances to work together on shared projects.
 Uses peer networking for coordination and task synchronization.
 """
 
-import time
-import json
 import hashlib
-import asyncio
-from typing import Dict, List, Optional, Set
-from dataclasses import dataclass, field, asdict
+import time
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Optional
 
 try:
     import httpx
@@ -43,7 +41,7 @@ class CollaborativeTask:
     name: str
     description: str
     priority: int = 1
-    depends_on: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
     status: TaskStatus = TaskStatus.AVAILABLE
     claimed_by: Optional[str] = None  # Agent ID
     claimed_at: Optional[float] = None
@@ -51,7 +49,7 @@ class CollaborativeTask:
     result: Optional[str] = None
     review_notes: Optional[str] = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -68,7 +66,7 @@ class CollaborativeTask:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'CollaborativeTask':
+    def from_dict(cls, data: dict) -> 'CollaborativeTask':
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -94,13 +92,13 @@ class CollaborativeProject:
     coordinator_id: str
     created_at: float
     updated_at: float
-    tasks: List[CollaborativeTask] = field(default_factory=list)
-    agents: Dict[str, AgentRole] = field(default_factory=dict)  # agent_id -> role
-    chat_log: List[Dict] = field(default_factory=list)  # Inter-agent messages
+    tasks: list[CollaborativeTask] = field(default_factory=list)
+    agents: dict[str, AgentRole] = field(default_factory=dict)  # agent_id -> role
+    chat_log: list[dict] = field(default_factory=list)  # Inter-agent messages
     version: int = 1  # For conflict resolution
     is_active: bool = True
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -117,7 +115,7 @@ class CollaborativeProject:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'CollaborativeProject':
+    def from_dict(cls, data: dict) -> 'CollaborativeProject':
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -140,7 +138,7 @@ class CollaborativeProject:
         approved = sum(1 for t in self.tasks if t.status == TaskStatus.APPROVED)
         return approved / len(self.tasks)
 
-    def get_available_tasks(self, agent_id: str) -> List[CollaborativeTask]:
+    def get_available_tasks(self, agent_id: str) -> list[CollaborativeTask]:
         """Get tasks available for an agent to claim."""
         available = []
         for task in self.tasks:
@@ -168,7 +166,7 @@ class CollaborativeProjectManager:
         agent_id: str,
         memory,
         llm,
-        peer_endpoints: List[str] = None,
+        peer_endpoints: list[str] = None,
         sync_interval_seconds: int = 30
     ):
         self.agent_id = agent_id
@@ -178,8 +176,8 @@ class CollaborativeProjectManager:
         self.sync_interval = sync_interval_seconds
 
         # Local project cache
-        self.projects: Dict[str, CollaborativeProject] = {}
-        self.pending_updates: List[Dict] = []
+        self.projects: dict[str, CollaborativeProject] = {}
+        self.pending_updates: list[dict] = []
 
         # Load persisted projects
         self._load_projects()
@@ -217,7 +215,7 @@ class CollaborativeProjectManager:
         self,
         name: str,
         description: str,
-        tasks: List[Dict] = None
+        tasks: list[dict] = None
     ) -> CollaborativeProject:
         """
         Create a new collaborative project.
@@ -410,7 +408,7 @@ class CollaborativeProjectManager:
         output = f"**Tasks in {project.name}:**\n\n"
 
         # Group by status
-        by_status: Dict[TaskStatus, List[CollaborativeTask]] = {}
+        by_status: dict[TaskStatus, list[CollaborativeTask]] = {}
         for task in project.tasks:
             if task.status not in by_status:
                 by_status[task.status] = []
@@ -662,7 +660,7 @@ class CollaborativeProjectManager:
     # Peer Synchronization
     # ============================================
 
-    async def sync_with_peers(self) -> Dict:
+    async def sync_with_peers(self) -> dict:
         """Synchronize project state with peer agents."""
         if not httpx or not self.peers:
             return {"synced": 0, "error": "No peers configured or httpx not available"}
@@ -700,7 +698,7 @@ class CollaborativeProjectManager:
             "errors": errors if errors else None
         }
 
-    async def _merge_project(self, project_id: str, remote_data: Dict):
+    async def _merge_project(self, project_id: str, remote_data: dict):
         """Merge remote project data with local (newer version wins)."""
         if project_id not in self.projects:
             # New project from peer
@@ -723,7 +721,7 @@ class CollaborativeProjectManager:
 
                 local.chat_log.sort(key=lambda m: m.get("timestamp", 0))
 
-    async def receive_sync(self, data: Dict) -> Dict:
+    async def receive_sync(self, data: dict) -> dict:
         """Receive sync data from a peer."""
         projects = data.get("projects", {})
         updated = 0
@@ -739,7 +737,7 @@ class CollaborativeProjectManager:
             "projects_received": updated
         }
 
-    def get_sync_data(self) -> Dict:
+    def get_sync_data(self) -> dict:
         """Get project data for syncing to peers."""
         return {
             "projects": {pid: p.to_dict() for pid, p in self.projects.items()},
@@ -750,7 +748,7 @@ class CollaborativeProjectManager:
     # Statistics
     # ============================================
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get collaboration statistics."""
         total_projects = len(self.projects)
         active_projects = sum(1 for p in self.projects.values() if p.is_active)

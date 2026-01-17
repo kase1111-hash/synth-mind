@@ -5,12 +5,12 @@ Implements a sliding window rate limiter with configurable limits per endpoint t
 Supports IP-based and token-based rate limiting.
 """
 
-import time
 import asyncio
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple, List
 from enum import Enum
+from typing import Optional
 
 
 class RateLimitTier(Enum):
@@ -40,7 +40,7 @@ class RateLimitConfig:
     enabled: bool = True
 
     # Whitelist IPs (never rate limited)
-    whitelist: List[str] = field(default_factory=lambda: ["127.0.0.1", "::1"])
+    whitelist: list[str] = field(default_factory=lambda: ["127.0.0.1", "::1"])
 
     # Block duration after exceeding limit (seconds)
     block_duration: int = 60
@@ -49,7 +49,7 @@ class RateLimitConfig:
 @dataclass
 class RequestRecord:
     """Record of requests from a client."""
-    timestamps: List[float] = field(default_factory=list)
+    timestamps: list[float] = field(default_factory=list)
     blocked_until: float = 0.0
 
 
@@ -62,7 +62,7 @@ class RateLimiter:
     """
 
     # Endpoint to tier mapping
-    ENDPOINT_TIERS: Dict[str, RateLimitTier] = {
+    ENDPOINT_TIERS: dict[str, RateLimitTier] = {
         # Strict tier - authentication endpoints
         "/api/auth/login": RateLimitTier.STRICT,
         "/api/auth/setup": RateLimitTier.STRICT,
@@ -92,7 +92,7 @@ class RateLimiter:
 
         # Track requests per client per tier
         # Structure: {tier: {client_id: RequestRecord}}
-        self._requests: Dict[RateLimitTier, Dict[str, RequestRecord]] = defaultdict(
+        self._requests: dict[RateLimitTier, dict[str, RequestRecord]] = defaultdict(
             lambda: defaultdict(RequestRecord)
         )
 
@@ -163,7 +163,7 @@ class RateLimiter:
         ip: str,
         path: str,
         token: Optional[str] = None
-    ) -> Tuple[bool, Dict]:
+    ) -> tuple[bool, dict]:
         """
         Check if request is allowed under rate limit.
 
@@ -266,7 +266,7 @@ class RateLimiter:
         async with self._lock:
             self._requests[tier][client_id].timestamps.append(now)
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get rate limiter statistics."""
         stats = {
             "enabled": self.config.enabled,

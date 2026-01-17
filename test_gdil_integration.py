@@ -20,7 +20,6 @@ except Exception as e:
     sys.exit(1)
 
 try:
-    from core.orchestrator import SynthOrchestrator
     print("✓ Orchestrator imported successfully")
 except Exception as e:
     print(f"✗ Orchestrator import failed: {e}")

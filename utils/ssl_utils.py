@@ -4,11 +4,11 @@ SSL/TLS Utilities for Synth Mind Dashboard.
 Provides certificate generation and loading for HTTPS/WSS support.
 """
 
+import ipaddress
 import os
 import ssl
-from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from pathlib import Path
 
 
 def generate_self_signed_cert(
@@ -17,7 +17,7 @@ def generate_self_signed_cert(
     hostname: str = "localhost",
     days_valid: int = 365,
     key_size: int = 2048
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Generate a self-signed certificate for development/testing.
 
@@ -36,16 +36,15 @@ def generate_self_signed_cert(
     """
     try:
         from cryptography import x509
-        from cryptography.x509.oid import NameOID
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.asymmetric import rsa
-        from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.backends import default_backend
-    except ImportError:
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+    except ImportError as err:
         raise ImportError(
             "cryptography library required for certificate generation. "
             "Install with: pip install cryptography"
-        )
+        ) from err
 
     # Create directories if needed
     cert_dir = Path(cert_path).parent
@@ -109,17 +108,13 @@ def generate_self_signed_cert(
     with open(cert_path, "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
-    print(f"Generated self-signed certificate:")
+    print("Generated self-signed certificate:")
     print(f"  Certificate: {cert_path}")
     print(f"  Private key: {key_path}")
     print(f"  Valid for: {days_valid} days")
     print(f"  Hostname: {hostname}")
 
     return str(cert_path), str(key_path)
-
-
-# Need to import ipaddress for certificate generation
-import ipaddress
 
 
 def create_ssl_context(
@@ -167,7 +162,7 @@ def create_ssl_context(
 def get_or_create_dev_certs(
     cert_dir: str = "certs",
     hostname: str = "localhost"
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Get existing development certificates or create new ones.
 
@@ -217,7 +212,7 @@ def print_cert_info(cert_path: str) -> None:
         with open(cert_path, "rb") as f:
             cert = x509.load_pem_x509_certificate(f.read(), default_backend())
 
-        print(f"\nCertificate Information:")
+        print("\nCertificate Information:")
         print(f"  Subject: {cert.subject.rfc4514_string()}")
         print(f"  Issuer: {cert.issuer.rfc4514_string()}")
         print(f"  Valid from: {cert.not_valid_before}")
@@ -227,9 +222,9 @@ def print_cert_info(cert_path: str) -> None:
         # Check validity
         now = datetime.utcnow()
         if now < cert.not_valid_before:
-            print(f"  Status: NOT YET VALID")
+            print("  Status: NOT YET VALID")
         elif now > cert.not_valid_after:
-            print(f"  Status: EXPIRED")
+            print("  Status: EXPIRED")
         else:
             days_left = (cert.not_valid_after - now).days
             print(f"  Status: Valid ({days_left} days remaining)")

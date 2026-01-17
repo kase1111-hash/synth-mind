@@ -3,13 +3,14 @@ Memory System - Hybrid vector + relational storage.
 Manages episodic memory, semantic embeddings, and persistent state.
 """
 
+import hashlib
 import json
 import os
 import sqlite3
 import time
-import hashlib
 from pathlib import Path
-from typing import List, Dict, Optional, Any, Tuple
+from typing import Any, Optional
+
 import numpy as np
 
 # Optional: FAISS for vector search
@@ -86,7 +87,7 @@ class EmbeddingProvider:
         else:
             return self._embed_hash_fallback(text)
 
-    def embed_batch(self, texts: List[str]) -> np.ndarray:
+    def embed_batch(self, texts: list[str]) -> np.ndarray:
         """Generate embeddings for multiple texts (more efficient)."""
         if self.provider_name == "sentence-transformers":
             embeddings = self.model.encode(texts, convert_to_numpy=True)
@@ -145,14 +146,14 @@ class MemorySystem:
         self.dimension = 384  # Updated after embedding provider init
 
         # Semantic memory index mapping (FAISS index -> DB id)
-        self.semantic_id_map: List[int] = []
+        self.semantic_id_map: list[int] = []
 
         self.last_activity_time = time.time()
         self.current_turn = 0
         self.max_context_length = 8192
 
         # Recent context embeddings for coherence tracking
-        self._context_embeddings: List[np.ndarray] = []
+        self._context_embeddings: list[np.ndarray] = []
         self._max_context_embeddings = 20
 
     async def initialize(self):
@@ -165,12 +166,12 @@ class MemorySystem:
         self._init_vector_store()
         self._load_persistent_state()
         self._rebuild_semantic_index()
-    
+
     def _init_database(self):
         """Initialize SQLite database for structured memory."""
         self.db = sqlite3.connect(self.db_path)
         cursor = self.db.cursor()
-        
+
         # Episodic memory table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS episodes (
@@ -182,7 +183,7 @@ class MemorySystem:
                 metadata TEXT
             )
         """)
-        
+
         # Long-term semantic storage
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS long_term (
@@ -191,7 +192,7 @@ class MemorySystem:
                 updated_at REAL
             )
         """)
-        
+
         # Conversation turns
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS turns (
@@ -231,7 +232,7 @@ class MemorySystem:
         """)
 
         self.db.commit()
-    
+
     def _init_vector_store(self):
         """Initialize FAISS vector store for semantic search."""
         if FAISS_AVAILABLE:
@@ -242,7 +243,7 @@ class MemorySystem:
                 self.vector_store = faiss.read_index(str(index_path))
                 # Load ID mapping
                 if id_map_path.exists():
-                    with open(id_map_path, 'r') as f:
+                    with open(id_map_path) as f:
                         self.semantic_id_map = json.load(f)
             else:
                 # Use IndexFlatIP for cosine similarity (after L2 normalization)
@@ -305,14 +306,14 @@ class MemorySystem:
         np.random.seed(hash_val % (2**32))
         return np.random.randn(self.dimension).astype(np.float32)
 
-    def embed_batch(self, texts: List[str]) -> np.ndarray:
+    def embed_batch(self, texts: list[str]) -> np.ndarray:
         """Generate embeddings for multiple texts (more efficient)."""
         if self.embedding_provider:
             return self.embedding_provider.embed_batch(texts)
         return np.array([self.embed(t) for t in texts], dtype=np.float32)
-    
+
     def store_episodic(
-        self, event: str, content: Dict[str, Any], valence: float = 0.0
+        self, event: str, content: dict[str, Any], valence: float = 0.0
     ):
         """Store episodic memory."""
         cursor = self.db.cursor()
@@ -330,8 +331,8 @@ class MemorySystem:
             )
         )
         self.db.commit()
-    
-    def retrieve_recent_episodic(self, n: int = 100) -> List[Dict]:
+
+    def retrieve_recent_episodic(self, n: int = 100) -> list[dict]:
         """Retrieve recent episodic memories."""
         cursor = self.db.cursor()
         cursor.execute(
@@ -343,7 +344,7 @@ class MemorySystem:
             """,
             (n,)
         )
-        
+
         results = []
         for row in cursor.fetchall():
             results.append({
@@ -352,14 +353,14 @@ class MemorySystem:
                 "valence": row[2],
                 "timestamp": row[3]
             })
-        
+
         return results
-    
+
     def store_turn(self, user_input: str, assistant_response: str):
         """Store conversation turn."""
         self.current_turn += 1
         self.last_activity_time = time.time()
-        
+
         cursor = self.db.cursor()
         cursor.execute(
             """
@@ -369,7 +370,7 @@ class MemorySystem:
             (time.time(), user_input, assistant_response, json.dumps({}))
         )
         self.db.commit()
-    
+
     def store_persistent(self, key: str, value: Any):
         """Store persistent key-value data."""
         cursor = self.db.cursor()
@@ -381,7 +382,7 @@ class MemorySystem:
             (key, json.dumps(value), time.time())
         )
         self.db.commit()
-    
+
     def retrieve_persistent(self, key: str) -> Optional[Any]:
         """Retrieve persistent data."""
         cursor = self.db.cursor()
@@ -391,11 +392,11 @@ class MemorySystem:
         )
         row = cursor.fetchone()
         return json.loads(row[0]) if row else None
-    
+
     def _load_persistent_state(self):
         """Load any persistent state on startup."""
         pass  # Loaded by individual modules
-    
+
     def update_last_activity_time(self):
         """Update activity timestamp."""
         self.last_activity_time = time.time()
@@ -409,7 +410,7 @@ class MemorySystem:
         content: str,
         category: str = "general",
         importance: float = 0.5,
-        metadata: Optional[Dict] = None
+        metadata: Optional[dict] = None
     ) -> int:
         """
         Store a semantic memory with vector embedding.
@@ -456,7 +457,7 @@ class MemorySystem:
         k: int = 5,
         category: Optional[str] = None,
         min_similarity: float = 0.0
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Search semantic memories by similarity to query.
         Returns list of memories with similarity scores.
@@ -527,7 +528,7 @@ class MemorySystem:
         text: str,
         k: int = 3,
         include_episodic: bool = True
-    ) -> Dict[str, List[Dict]]:
+    ) -> dict[str, list[dict]]:
         """
         Get memories related to text from multiple sources.
         Combines semantic search with recent episodic memories.
@@ -634,7 +635,7 @@ class MemorySystem:
 
         return False
 
-    def get_embedding_stats(self) -> Dict:
+    def get_embedding_stats(self) -> dict:
         """Get statistics about the embedding system."""
         cursor = self.db.cursor()
         cursor.execute("SELECT COUNT(*) FROM semantic_memories")
@@ -659,7 +660,7 @@ class MemorySystem:
         parsed_intent: str,
         confidence_score: float,
         context: str,
-        signals: Dict[str, float]
+        signals: dict[str, float]
     ) -> int:
         """
         Log an uncertainty event for later pattern analysis.
@@ -691,7 +692,7 @@ class MemorySystem:
         unresolved_only: bool = False,
         min_confidence: float = 0.0,
         max_confidence: float = 1.0
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Retrieve uncertainty logs for pattern analysis.
         Used by the harvest cycle to identify linguistic patterns.
@@ -750,7 +751,7 @@ class MemorySystem:
         )
         self.db.commit()
 
-    def get_uncertainty_stats(self) -> Dict:
+    def get_uncertainty_stats(self) -> dict:
         """Get statistics about uncertainty logs for monitoring."""
         cursor = self.db.cursor()
 

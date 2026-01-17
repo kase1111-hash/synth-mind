@@ -3,10 +3,9 @@ Ollama Setup Utility
 Helps users automatically install and configure Ollama if not available.
 """
 
-import os
-import sys
 import subprocess
-from typing import Optional, Tuple
+import sys
+from typing import Optional
 
 
 def check_ollama_installed() -> bool:
@@ -146,7 +145,7 @@ def pull_model(model_name: str = "llama3.2") -> bool:
         return False
 
 
-def prompt_ollama_setup() -> Tuple[bool, Optional[str]]:
+def prompt_ollama_setup() -> tuple[bool, Optional[str]]:
     """
     Interactive prompt to help user set up Ollama.
     Returns (success, model_name) tuple.
@@ -161,7 +160,6 @@ def prompt_ollama_setup() -> Tuple[bool, Optional[str]]:
     print()
 
     # Check if running in non-interactive environment
-    import sys
     if not sys.stdin.isatty():
         print("⚠️  Running in non-interactive mode.")
         print("\nTo use Synth Mind, please set one of these environment variables:")

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Union
 
 
 class FirewallMode(Enum):
@@ -33,11 +33,11 @@ class FirewallConfig:
     mode: FirewallMode = FirewallMode.BLACKLIST
 
     # IP lists
-    whitelist: List[str] = field(default_factory=list)
-    blacklist: List[str] = field(default_factory=list)
+    whitelist: list[str] = field(default_factory=list)
+    blacklist: list[str] = field(default_factory=list)
 
     # Always allowed IPs (localhost, etc.)
-    always_allowed: List[str] = field(default_factory=lambda: [
+    always_allowed: list[str] = field(default_factory=lambda: [
         "127.0.0.1",
         "::1",
         "localhost",
@@ -77,17 +77,17 @@ class IPFirewall:
         self.config = config or FirewallConfig()
 
         # Parsed IP networks for efficient matching
-        self._whitelist_networks: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = []
-        self._blacklist_networks: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = []
-        self._always_allowed: Set[str] = set()
-        self._peer_ips: Set[str] = set()
+        self._whitelist_networks: list[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = []
+        self._blacklist_networks: list[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = []
+        self._always_allowed: set[str] = set()
+        self._peer_ips: set[str] = set()
 
         # Violation tracking
-        self._violations: Dict[str, List[float]] = {}  # IP -> list of timestamps
-        self._auto_blocked: Dict[str, float] = {}  # IP -> block expiry time
+        self._violations: dict[str, list[float]] = {}  # IP -> list of timestamps
+        self._auto_blocked: dict[str, float] = {}  # IP -> block expiry time
 
         # Blocked request log
-        self._blocked_log: List[Dict] = []
+        self._blocked_log: list[dict] = []
         self._max_log_entries = 1000
 
         # Initialize
@@ -95,7 +95,7 @@ class IPFirewall:
         self._load_peers()
         self._load_rules()
 
-    def _parse_ip_list(self, ip_list: List[str]) -> List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]:
+    def _parse_ip_list(self, ip_list: list[str]) -> list[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]:
         """Parse a list of IPs/CIDRs into network objects."""
         networks = []
         for ip_str in ip_list:
@@ -139,7 +139,7 @@ class IPFirewall:
             return
 
         try:
-            with open(peers_path, 'r') as f:
+            with open(peers_path) as f:
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith('#'):
@@ -168,7 +168,7 @@ class IPFirewall:
             return
 
         try:
-            with open(rules_path, 'r') as f:
+            with open(rules_path) as f:
                 data = json.load(f)
 
             # Load dynamic blacklist
@@ -205,7 +205,7 @@ class IPFirewall:
     def _ip_in_networks(
         self,
         ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address],
-        networks: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
+        networks: list[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
     ) -> bool:
         """Check if an IP is in any of the given networks."""
         for network in networks:
@@ -254,7 +254,7 @@ class IPFirewall:
         if len(self._blocked_log) > self._max_log_entries:
             self._blocked_log = self._blocked_log[-self._max_log_entries:]
 
-    def check_ip(self, ip_str: str, path: str = None) -> Tuple[bool, str]:
+    def check_ip(self, ip_str: str, path: str = None) -> tuple[bool, str]:
         """
         Check if an IP address is allowed.
 
@@ -392,7 +392,7 @@ class IPFirewall:
         if ip in self._violations:
             del self._violations[ip]
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get firewall statistics."""
         now = time.time()
 
@@ -410,11 +410,11 @@ class IPFirewall:
             "blocked_requests_logged": len(self._blocked_log),
         }
 
-    def get_blocked_log(self, limit: int = 100) -> List[Dict]:
+    def get_blocked_log(self, limit: int = 100) -> list[dict]:
         """Get recent blocked request log."""
         return self._blocked_log[-limit:]
 
-    def get_rules(self) -> Dict:
+    def get_rules(self) -> dict:
         """Get current firewall rules."""
         return {
             "whitelist": [str(n) for n in self._whitelist_networks],
@@ -528,7 +528,7 @@ if __name__ == "__main__":
         print(f"\nBlacklist ({len(rules['blacklist'])} rules):")
         for ip in rules['blacklist']:
             print(f"  {ip}")
-        print(f"\nAlways Allowed:")
+        print("\nAlways Allowed:")
         for ip in rules['always_allowed']:
             print(f"  {ip}")
         print(f"\nPeers ({len(rules['peers'])}):")

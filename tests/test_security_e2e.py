@@ -4,11 +4,9 @@ End-to-End Security Tests for Synth Mind
 Tests all security fixes from the security audit.
 """
 
-import sys
 import os
+import sys
 import time
-import tempfile
-import json
 from pathlib import Path
 
 # Add parent directory to path
@@ -197,11 +195,11 @@ def main():
         results.append(result)
 
         if result["passed"]:
-            print(f"✓ PASSED")
+            print("✓ PASSED")
             print(f"   {result['message']}")
             passed += 1
         else:
-            print(f"✗ FAILED")
+            print("✗ FAILED")
             print(f"   {result['message']}")
             failed += 1
         print()
