@@ -103,7 +103,7 @@ class EmbeddingProvider:
         return embedding.astype(np.float32)
 
     def _embed_openai(self, text: str) -> np.ndarray:
-        """Embed using OpenAI API."""
+        """Embed using OpenAI API (synchronous - use embed_async for async contexts)."""
         try:
             response = self.model.embeddings.create(
                 model="text-embedding-3-small",
@@ -113,6 +113,16 @@ class EmbeddingProvider:
         except Exception as e:
             print(f"⚠️  OpenAI embedding failed: {e}, using fallback")
             return self._embed_hash_fallback(text)
+
+    async def embed_async(self, text: str) -> np.ndarray:
+        """Generate embedding asynchronously (safe for async contexts)."""
+        import asyncio
+        return await asyncio.to_thread(self.embed, text)
+
+    async def embed_batch_async(self, texts: list[str]) -> np.ndarray:
+        """Generate embeddings for multiple texts asynchronously."""
+        import asyncio
+        return await asyncio.to_thread(self.embed_batch, texts)
 
     def _embed_hash_fallback(self, text: str) -> np.ndarray:
         """Deterministic hash-based fallback (not semantic, but consistent)."""
@@ -169,7 +179,9 @@ class MemorySystem:
 
     def _init_database(self):
         """Initialize SQLite database for structured memory."""
-        self.db = sqlite3.connect(self.db_path)
+        # Use check_same_thread=False for async contexts where DB may be accessed
+        # from different threads. We rely on SQLite's internal serialization.
+        self.db = sqlite3.connect(self.db_path, check_same_thread=False)
         cursor = self.db.cursor()
 
         # Episodic memory table

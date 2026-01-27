@@ -798,10 +798,7 @@ class ToolManager:
 
     async def execute_async(self, tool_name: str, **kwargs) -> dict[str, Any]:
         """Execute a tool asynchronously (runs in thread pool)."""
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, lambda: self.execute(tool_name, **kwargs)
-        )
+        return await asyncio.to_thread(self.execute, tool_name, **kwargs)
 
     def list_tools(self) -> list[str]:
         """List available tools."""

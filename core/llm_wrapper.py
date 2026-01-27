@@ -3,6 +3,7 @@ LLM Wrapper - Unified interface for multiple LLM providers.
 Supports OpenAI, Anthropic, and local models via Ollama.
 """
 
+import asyncio
 import os
 from enum import Enum
 from typing import Optional
@@ -98,7 +99,8 @@ class LLMWrapper:
         if system:
             kwargs["system"] = system
 
-        response = self.client.messages.create(**kwargs)
+        # Run blocking API call in thread pool to avoid blocking the event loop
+        response = await asyncio.to_thread(self.client.messages.create, **kwargs)
         return response.content[0].text
 
     async def _generate_openai(
@@ -112,7 +114,9 @@ class LLMWrapper:
 
         messages.append({"role": "user", "content": prompt})
 
-        response = self.client.chat.completions.create(
+        # Run blocking API call in thread pool to avoid blocking the event loop
+        response = await asyncio.to_thread(
+            self.client.chat.completions.create,
             model=self.model,
             messages=messages,
             temperature=temperature,
