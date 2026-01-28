@@ -127,8 +127,9 @@ class EmbeddingProvider:
     def _embed_hash_fallback(self, text: str) -> np.ndarray:
         """Deterministic hash-based fallback (not semantic, but consistent)."""
         hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
-        np.random.seed(hash_val % (2**32))
-        return np.random.randn(self.dimension).astype(np.float32)
+        # Use local RNG to avoid mutating global random state
+        rng = np.random.default_rng(hash_val % (2**32))
+        return rng.standard_normal(self.dimension).astype(np.float32)
 
     @staticmethod
     def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -313,10 +314,10 @@ class MemorySystem:
         """Generate embedding for text using the configured provider."""
         if self.embedding_provider:
             return self.embedding_provider.embed(text)
-        # Fallback if provider not initialized
+        # Fallback if provider not initialized - use local RNG to avoid mutating global state
         hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
-        np.random.seed(hash_val % (2**32))
-        return np.random.randn(self.dimension).astype(np.float32)
+        rng = np.random.default_rng(hash_val % (2**32))
+        return rng.standard_normal(self.dimension).astype(np.float32)
 
     def embed_batch(self, texts: list[str]) -> np.ndarray:
         """Generate embeddings for multiple texts (more efficient)."""

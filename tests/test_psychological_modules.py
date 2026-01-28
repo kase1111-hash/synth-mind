@@ -46,10 +46,10 @@ class MockMemory:
     def embed(self, text):
         """Return mock embedding."""
         import numpy as np
-        # Simple hash-based deterministic embedding
+        # Simple hash-based deterministic embedding using local RNG
         hash_val = hash(text) % 1000000
-        np.random.seed(hash_val)
-        return np.random.randn(384)
+        rng = np.random.default_rng(hash_val)
+        return rng.standard_normal(384)
 
     def store_episodic(self, event, content, valence=0.0):
         self.episodic_store.append({
