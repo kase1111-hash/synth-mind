@@ -56,6 +56,7 @@ class SynthOrchestrator:
         self.context = []
         self.turn_count = 0
         self.running = False
+        self._background_tasks: list[asyncio.Task] = []
 
     def _load_personality_config(self) -> dict:
         """Load personality configuration from YAML."""
@@ -133,9 +134,11 @@ class SynthOrchestrator:
             peer_endpoints=self.social.peers if self.social else []
         )
 
-        # Start background tasks
-        asyncio.create_task(self._background_consolidation())
-        asyncio.create_task(self._background_social())
+        # Start background tasks and store references for proper cleanup
+        self._background_tasks = [
+            asyncio.create_task(self._background_consolidation()),
+            asyncio.create_task(self._background_social()),
+        ]
 
     async def run(self):
         """Main conversation loop."""
@@ -276,9 +279,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
 
     async def _get_input(self) -> str:
         """Get user input asynchronously."""
-        return await asyncio.get_event_loop().run_in_executor(
-            None, input, "You: "
-        )
+        return await asyncio.to_thread(input, "You: ")
 
     def _format_context(self, window: int = 20) -> str:
         """Format recent context for prompts."""
@@ -327,6 +328,25 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             template_id = command[10:].strip()
             response = self.gdil.get_template_details(template_id)
             print(f"\n📋 {response}\n")
+        elif cmd == "/project status":
+            # Project status - must come before general /project handler
+            status = self.gdil.get_project_status()
+            if status:
+                print("\n📊 Project Status:")
+                print(f"  Phase: {status['phase']}")
+                print(f"  Progress: {status['progress']*100:.0f}%")
+                print(f"  Tasks: {status['completed_tasks']}/{status['total_tasks']}")
+                print(f"  Current: {status['current_subtask']}\n")
+            else:
+                print("\n📊 No active project\n")
+        elif cmd == "/project pause":
+            # Pause current project
+            response = self.gdil.pause_project()
+            print(f"\n⏸️  {response}\n")
+        elif cmd == "/resume project":
+            # Resume project - must come before general /project handler
+            response = self.gdil.resume_project()
+            print(f"\n🎯 {response}\n")
         elif cmd.startswith("/project template "):
             # Start project from template
             args = command[18:].strip()
@@ -340,32 +360,15 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             project_id = command[16:].strip()
             response = self.gdil.switch_project(project_id)
             print(f"\n🔄 {response}\n")
-        elif cmd == "/project pause":
-            # Pause current project
-            response = self.gdil.pause_project()
-            print(f"\n⏸️  {response}\n")
         elif cmd.startswith("/project archive "):
             # Archive a project
             project_id = command[17:].strip()
             response = self.gdil.archive_project(project_id)
             print(f"\n📦 {response}\n")
         elif cmd.startswith("/project "):
-            # Start new project
+            # Start new project - general handler must come LAST
             description = command[9:].strip()
             response = await self.gdil.start_project(description)
-            print(f"\n🎯 {response}\n")
-        elif cmd == "/project status":
-            status = self.gdil.get_project_status()
-            if status:
-                print("\n📊 Project Status:")
-                print(f"  Phase: {status['phase']}")
-                print(f"  Progress: {status['progress']*100:.0f}%")
-                print(f"  Tasks: {status['completed_tasks']}/{status['total_tasks']}")
-                print(f"  Current: {status['current_subtask']}\n")
-            else:
-                print("\n📊 No active project\n")
-        elif cmd == "/resume project":
-            response = self.gdil.resume_project()
             print(f"\n🎯 {response}\n")
         # Collaborative Projects Commands
         elif cmd == "/collab" or cmd == "/collab help":
@@ -701,7 +704,18 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
                 await self.social.initiate_companionship_cycle()
 
     async def shutdown(self):
-        """Graceful shutdown - save state."""
+        """Graceful shutdown - cancel background tasks and save state."""
         self.running = False
+
+        # Cancel all background tasks
+        for task in self._background_tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        self._background_tasks.clear()
         await self.memory.save_state()
         print("✓ State saved")

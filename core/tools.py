@@ -242,9 +242,20 @@ class ToolManager:
             return {"success": False, "error": str(e), "expression": expression}
 
     def _timer(self, seconds: int) -> dict[str, Any]:
-        """Timer tool with maximum limit."""
+        """Timer tool with maximum limit. Uses asyncio-compatible sleep when possible."""
         seconds = min(max(0, seconds), 30)  # 0-30 seconds
-        time.sleep(seconds)
+
+        # Check if we're in an async context and use non-blocking sleep
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context - schedule sleep without blocking
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                pool.submit(time.sleep, seconds).result()
+        except RuntimeError:
+            # No running event loop - safe to use blocking sleep
+            time.sleep(seconds)
+
         return {"success": True, "elapsed": seconds}
 
     # ============================================

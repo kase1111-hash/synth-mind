@@ -218,8 +218,8 @@ class TestCoreIntegration:
 
                 import numpy as np
                 hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
-                np.random.seed(hash_val % (2**32))
-                return np.random.randn(384).tolist()
+                rng = np.random.default_rng(hash_val % (2**32))
+                return rng.standard_normal(384).tolist()
 
         return MockLLM()
 

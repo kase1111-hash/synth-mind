@@ -158,10 +158,10 @@ class LLMWrapper:
             return response.data[0].embedding
         else:
             # Fallback: use sentence-transformers or similar
-            # For now, return dummy embedding
+            # For now, return dummy embedding using local RNG to avoid global state mutation
             import hashlib
 
             import numpy as np
             hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
-            np.random.seed(hash_val % (2**32))
-            return np.random.randn(384).tolist()
+            rng = np.random.default_rng(hash_val % (2**32))
+            return rng.standard_normal(384).tolist()
