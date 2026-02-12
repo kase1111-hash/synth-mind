@@ -42,7 +42,7 @@ class MockLLM:
                 {"text": "Can you explain?", "probability": 0.3},
                 {"text": "What else?", "probability": 0.2}
             ]'''
-        elif "reflection" in prompt_lower:
+        elif "reflection" in prompt_lower or "evaluate yourself" in prompt_lower:
             return '''{
                 "coherence_score": 0.85,
                 "alignment_score": 0.9,
@@ -50,6 +50,20 @@ class MockLLM:
                 "recommended_adjustments": {},
                 "self_statement": "Operating well",
                 "overall_insight": "Good progress"
+            }'''
+        elif "self-narrative" in prompt_lower or "narrative" in prompt_lower:
+            return (
+                "I am an AI that has been reflecting on my interactions. "
+                "I have learned to be more attentive and empathetic."
+            )
+        elif "reformat" in prompt_lower or "valid json" in prompt_lower:
+            return '''{
+                "coherence_score": 0.75,
+                "alignment_score": 0.8,
+                "issues_detected": [],
+                "recommended_adjustments": {},
+                "self_statement": "Reformatted",
+                "overall_insight": "Recovered from parse failure"
             }'''
         return "Mock response"
 
@@ -71,6 +85,7 @@ class MockMemory:
         self.episodic_buffer = []
         self.persistent_store = {}
         self.conversation_history = []
+        self.current_turn = 0
 
     async def initialize(self):
         pass
@@ -82,6 +97,7 @@ class MockMemory:
         return rng.standard_normal(384)
 
     def store_turn(self, user_input, response):
+        self.current_turn += 1
         self.conversation_history.append({
             "user": user_input,
             "assistant": response
@@ -117,29 +133,50 @@ class MockMemory:
 
 
 class MockEmotionRegulator:
-    """Mock emotion regulator for testing."""
+    """Mock emotion regulator with PAD model for testing."""
 
     def __init__(self):
         self.current_valence = 0.5
+        self.current_arousal = 0.0
+        self.current_dominance = 0.0
         self.signals = []
         self.tone_adjustments = []
 
-    def apply_reward_signal(self, valence, label, intensity):
+    def apply_reward_signal(self, valence, label, intensity,
+                            arousal_delta=0.0, dominance_delta=0.0):
         self.signals.append({
             "valence": valence,
             "label": label,
-            "intensity": intensity
+            "intensity": intensity,
+            "arousal_delta": arousal_delta,
+            "dominance_delta": dominance_delta,
         })
         self.current_valence = max(-1, min(1, self.current_valence + valence * intensity * 0.1))
+        self.current_arousal = max(-1, min(1, self.current_arousal + arousal_delta * intensity * 0.1))
+        self.current_dominance = max(-1, min(1, self.current_dominance + dominance_delta * intensity * 0.1))
 
     def adjust_tone(self, *args):
         self.tone_adjustments.append(args)
 
     def current_state(self):
-        return {"valence": self.current_valence, "tags": ["neutral"]}
+        return {
+            "valence": self.current_valence,
+            "arousal": self.current_arousal,
+            "dominance": self.current_dominance,
+            "tags": ["neutral"]
+        }
 
     def get_current_state(self):
         return self.current_state()
+
+    def get_system_prompt_modifier(self):
+        return ""
+
+    def get_temperature_modifier(self):
+        return 0.0
+
+    def apply_decay(self):
+        pass
 
 
 class MockTemporalPurpose:
@@ -152,7 +189,7 @@ class MockTemporalPurpose:
     def current_narrative_summary(self):
         return self.narrative_summary
 
-    def incorporate_reflection(self, insight, statement):
+    async def incorporate_reflection(self, insight, statement):
         self.reflections.append((insight, statement))
 
 

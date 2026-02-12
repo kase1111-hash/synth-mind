@@ -4,11 +4,13 @@ Tunes task difficulty to maintain optimal cognitive flow.
 """
 
 
-
 class RewardCalibrationModule:
     """
     Implements flow-state optimization by monitoring task difficulty
     and adjusting internal parameters.
+
+    Temperature range: 0.3-1.0 (wider than before for perceptible effects).
+    Context load uses turn count as a proxy instead of a non-existent attribute.
     """
 
     def __init__(
@@ -30,11 +32,14 @@ class RewardCalibrationModule:
         self.difficulty_moving_avg = 0.5
         self.alpha = 0.1  # Smoothing factor
 
-        # Adjustable parameters
+        # Adjustable parameters — wider range for perceptible effects
         self.persistence_factor = 1.0
         self.creativity_temperature = 0.7
         self.rejection_threshold = 0.9
         self.exploration_bonus = 0.2
+
+        # Track difficulty estimates for validation
+        self.difficulty_history: list[float] = []
 
     def estimate_task_difficulty(self) -> tuple[float, dict]:
         """
@@ -43,19 +48,17 @@ class RewardCalibrationModule:
         """
         signals = {}
 
-        # 1. Predictive alignment (inverse)
+        # 1. Predictive alignment (inverse) — low alignment = hard to predict
         recent_alignment = self.dreaming.recent_alignment_avg(n=5)
         signals["predictive"] = 1.0 - recent_alignment
 
-        # 2. Assurance uncertainty
+        # 2. Assurance uncertainty — high uncertainty = hard
         recent_uncertainty = self.assurance.recent_uncertainty_avg(n=5)
         signals["uncertainty"] = recent_uncertainty
 
-        # 3. Context load (simplified)
-        context_ratio = min(
-            len(self.memory.context if hasattr(self.memory, 'context') else []) / 50,
-            1.0
-        )
+        # 3. Context load — use memory's current_turn as proxy for complexity
+        turn_count = getattr(self.memory, 'current_turn', 0)
+        context_ratio = min(turn_count / 50.0, 1.0)
         signals["context_load"] = context_ratio
 
         # Weighted aggregate
@@ -75,6 +78,11 @@ class RewardCalibrationModule:
             (1 - self.alpha) * self.difficulty_moving_avg
         )
 
+        # Track history
+        self.difficulty_history.append(self.difficulty_moving_avg)
+        if len(self.difficulty_history) > 100:
+            self.difficulty_history.pop(0)
+
         flow_deviation = 0.0
         adjustment_label = "balanced"
 
@@ -83,9 +91,9 @@ class RewardCalibrationModule:
             flow_deviation = self.target_min - self.difficulty_moving_avg
             adjustment_label = "bored"
 
-            # Increase creativity
+            # Increase creativity (wider range: up to 1.0)
             self.creativity_temperature = min(
-                1.2, self.creativity_temperature + 0.1 * flow_deviation
+                1.0, self.creativity_temperature + 0.1 * flow_deviation
             )
             self.exploration_bonus += 0.1 * flow_deviation
             self.persistence_factor = max(
@@ -97,9 +105,9 @@ class RewardCalibrationModule:
             flow_deviation = self.difficulty_moving_avg - self.target_max
             adjustment_label = "overloaded"
 
-            # Reduce temperature
+            # Reduce temperature (wider range: down to 0.3)
             self.creativity_temperature = max(
-                0.4, self.creativity_temperature - 0.1 * flow_deviation
+                0.3, self.creativity_temperature - 0.1 * flow_deviation
             )
             self.persistence_factor = min(
                 0.7, self.persistence_factor - 0.15 * flow_deviation
