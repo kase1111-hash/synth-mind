@@ -12,7 +12,7 @@ pip install -r requirements.txt
 python run_synth.py
 
 # Run with dashboard
-python dashboard/run_synth_with_dashboard.py
+python -m dashboard.server
 ```
 
 ## Architecture Overview
@@ -21,31 +21,26 @@ python dashboard/run_synth_with_dashboard.py
 - `orchestrator.py` - Main event loop, module coordination, command handling
 - `llm_wrapper.py` - Multi-provider LLM interface (Anthropic, OpenAI, Ollama)
 - `memory.py` - Hybrid vector (FAISS) + SQL (SQLite) storage with embeddings
-- `tools.py` - 10 sandboxed tools (calculator, web_search, code_execute, file operations, etc.)
+- `tools.py` - 3 sandboxed tools (calculator, code_execute, json_parse)
 
 ### Psychological Layer (`psychological/`)
-Six interconnected cognitive modules:
+Five interconnected cognitive modules:
 1. `predictive_dreaming.py` - Anticipatory empathy via dream buffer
 2. `assurance_resolution.py` - Uncertainty tracking and confidence calibration
 3. `meta_reflection.py` - Periodic introspection and coherence checking
 4. `temporal_purpose.py` - Evolving identity and self-narrative
 5. `reward_calibration.py` - Flow state optimization (0.4-0.7 target)
-6. `social_companionship.py` - Peer networking and federated learning
-
-Additional modules:
-- `goal_directed_iteration.py` - Multi-project management (GDIL)
-- `collaborative_projects.py` - Multi-agent collaboration
-- `project_templates.py` - 10 quick-start templates
 
 ### Utilities (`utils/`)
 - `emotion_regulator.py` - Valence tracking (-1 to +1)
 - `metrics.py` - Performance monitoring
+- `mandelbrot_weighting.py` - Frequency-aware word weighting
 - `auth.py` - JWT authentication
-- `version_control.py` - Git integration
+- `logging.py` - Logging configuration
 
 ### Dashboard (`dashboard/`)
-- `server.py` - WebSocket + REST API server
-- `dashboard.html` - 8-card monitoring interface
+- `server.py` - WebSocket + REST API server with state streaming
+- `dashboard.html` - Monitoring interface
 
 ## Configuration
 
@@ -75,7 +70,6 @@ FLOW_TARGET_MAX=0.7
 
 ### Config Files
 - `config/personality.yaml` - 4 personality presets (empathetic, analytical, creative, focused)
-- `config/peers.txt` - Peer endpoints for social module
 
 ## Development
 
@@ -97,18 +91,6 @@ Tests use `pytest-asyncio` with `asyncio_mode = auto`. Shared fixtures in `tests
 - `mock_memory` - In-memory storage
 - `mock_emotion` - Valence tracking stub
 - `temp_state_dir` - Temporary state directory
-
-### Linting
-```bash
-# Ruff linting
-ruff check .
-
-# Black formatting
-black .
-
-# Type checking
-mypy core psychological utils
-```
 
 ### Code Style
 - Line length: 100 characters
@@ -135,43 +117,20 @@ class SomeModule:
 ### Graceful Degradation
 Embedding provider falls back: sentence-transformers > OpenAI > hash-fallback
 
-### Error Recovery
-```python
-try:
-    result = await risky_operation()
-except SpecificError as e:
-    print(f"Operation failed: {e}")
-    return fallback_value
-```
-
-## Docker
-
-```bash
-# Build
-docker build -t synth-mind .
-
-# Run
-docker-compose up
-
-# Health check
-curl http://localhost:8080/health/live
-```
-
 ## CLI Commands
 - `/state` - Show current psychological state
 - `/reflect` - Trigger meta-reflection
 - `/dream` - Show dream predictions
 - `/purpose` - Display identity narrative
-- `/project` - GDIL project management
 - `/tools` - List available tools
-- `/vcs` - Version control status
+- `/tool <name>` - Execute a tool
 - `/reset` - Reset state
 - `/quit` - Exit
 
 ## Key Dependencies
-- `anthropic` / `openai` / `ollama` - LLM providers
+- `anthropic` / `openai` - LLM providers
 - `aiohttp`, `httpx` - Async HTTP
-- `faiss`, `sentence-transformers` - Vector search & embeddings
-- `SQLAlchemy`, `aiosqlite` - Database
+- `faiss-cpu` - Vector search
+- `numpy`, `scikit-learn` - Embeddings
 - `PyJWT` - Authentication
 - `rich` - CLI output formatting

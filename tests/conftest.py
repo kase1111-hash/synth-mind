@@ -51,31 +51,6 @@ class MockLLM:
                 "self_statement": "Operating well",
                 "overall_insight": "Good progress"
             }'''
-        elif "project" in prompt_lower and "clarifying" in prompt_lower:
-            return '''{
-                "acknowledgment": "Sounds exciting!",
-                "end_transformation_query": "What should the result look like?",
-                "clarifying_questions": ["Question 1?", "Question 2?"],
-                "identified_uncertainties": []
-            }'''
-        elif "roadmap" in prompt_lower:
-            return '''{
-                "brief": "Test project brief",
-                "end_transformation": "From A to B",
-                "roadmap": [
-                    {"name": "Task 1", "description": "Do thing", "priority": 1, "depends_on": []}
-                ],
-                "confirmation_question": "Ready to start?"
-            }'''
-        elif "subtask" in prompt_lower:
-            return '''{
-                "output": "Task completed",
-                "explanation": "Did the thing",
-                "questions": [],
-                "progress_estimate": 1.0,
-                "blockers": []
-            }'''
-
         return "Mock response"
 
     def get_embedding(self, text):
