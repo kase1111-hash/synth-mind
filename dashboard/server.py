@@ -437,8 +437,10 @@ class DashboardServer:
             "timestamp": datetime.now().isoformat(),
             "turn_count": self.orchestrator.turn_count,
 
-            # Emotional state
+            # Emotional state (PAD model)
             "valence": emotion_state['valence'],
+            "arousal": emotion_state.get('arousal', 0.0),
+            "dominance": emotion_state.get('dominance', 0.0),
             "mood_tags": emotion_state['tags'],
 
             # Predictive dreaming
