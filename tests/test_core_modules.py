@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # LLM Wrapper Tests
 # =============================================================================
 
+
 class TestLLMWrapper:
     """Tests for LLMWrapper."""
 
@@ -68,12 +69,14 @@ class TestLLMWrapper:
 # Tool Manager Tests
 # =============================================================================
 
+
 class TestToolManager:
     """Tests for ToolManager."""
 
     @pytest.fixture
     def manager(self):
         from core.tools import ToolManager
+
         return ToolManager()
 
     def test_get_all_tool_info(self, manager):
@@ -124,6 +127,7 @@ class TestToolManager:
 # Memory System Tests
 # =============================================================================
 
+
 class TestMemorySystem:
     """Tests for MemorySystem."""
 
@@ -151,15 +155,12 @@ class TestMemorySystem:
     @pytest.mark.asyncio
     async def test_store_episodic(self, memory):
         """Test episodic memory storage."""
-        memory.store_episodic(
-            event="test_event",
-            content={"data": "test"},
-            valence=0.5
-        )
+        memory.store_episodic(event="test_event", content={"data": "test"}, valence=0.5)
 
     def test_embed_text(self):
         """Test text embedding."""
         from core.memory import MemorySystem
+
         memory = MemorySystem()
         embedding = memory.embed("Test text for embedding")
 
@@ -196,6 +197,7 @@ class TestMemorySystem:
     def test_detect_coherence_drift(self):
         """Test coherence drift detection."""
         from core.memory import MemorySystem
+
         memory = MemorySystem()
         drift = memory.detect_coherence_drift(threshold=0.7)
 
@@ -206,12 +208,14 @@ class TestMemorySystem:
 # Integration Tests
 # =============================================================================
 
+
 class TestCoreIntegration:
     """Integration tests for core modules working together."""
 
     @pytest.fixture
     def mock_llm(self):
         """Create a mock LLM that doesn't require API keys."""
+
         class MockLLM:
             async def generate(self, prompt, **kwargs):
                 return "Mock response to: " + prompt[:50]
@@ -220,6 +224,7 @@ class TestCoreIntegration:
                 import hashlib
 
                 import numpy as np
+
                 hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
                 rng = np.random.default_rng(hash_val % (2**32))
                 return rng.standard_normal(384).tolist()

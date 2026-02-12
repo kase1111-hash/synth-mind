@@ -6,7 +6,6 @@ Uses a separate LLM call to rate responses on standardized dimensions.
 import json
 from typing import Optional
 
-
 # Evaluation dimensions with descriptions
 DIMENSIONS = {
     "coherence": "How logically consistent and well-structured is the response?",
@@ -48,13 +47,9 @@ class LLMJudge:
         """
         context_str = ""
         if context:
-            context_str = "\n".join(
-                f"Turn {i+1}: {turn}" for i, turn in enumerate(context[-5:])
-            )
+            context_str = "\n".join(f"Turn {i+1}: {turn}" for i, turn in enumerate(context[-5:]))
 
-        dimensions_str = "\n".join(
-            f"- {name}: {desc}" for name, desc in DIMENSIONS.items()
-        )
+        dimensions_str = "\n".join(f"- {name}: {desc}" for name, desc in DIMENSIONS.items())
 
         prompt = f"""You are evaluating two AI assistant responses to the same user input.
 Rate each response on a scale of 1-5 for each dimension.
@@ -125,7 +120,7 @@ Output ONLY valid JSON:
 
     def _default_judgment(self) -> dict:
         """Return neutral default when parsing fails."""
-        neutral = {dim: 3 for dim in DIMENSIONS}
+        neutral = dict.fromkeys(DIMENSIONS, 3)
         return {
             "response_a": dict(neutral),
             "response_b": dict(neutral),
@@ -145,8 +140,8 @@ Output ONLY valid JSON:
         dims = list(DIMENSIONS.keys())
 
         # Aggregate scores
-        a_scores = {d: 0.0 for d in dims}
-        b_scores = {d: 0.0 for d in dims}
+        a_scores = dict.fromkeys(dims, 0.0)
+        b_scores = dict.fromkeys(dims, 0.0)
         wins = {"A": 0, "B": 0, "TIE": 0}
 
         # Category breakdown
@@ -174,9 +169,7 @@ Output ONLY valid JSON:
 
             winner = j.get("winner", "TIE")
             wins[winner] = wins.get(winner, 0) + 1
-            category_results[cat]["wins"][winner] = (
-                category_results[cat]["wins"].get(winner, 0) + 1
-            )
+            category_results[cat]["wins"][winner] = category_results[cat]["wins"].get(winner, 0) + 1
 
         # Compute averages
         a_avg = {d: a_scores[d] / n for d in dims}

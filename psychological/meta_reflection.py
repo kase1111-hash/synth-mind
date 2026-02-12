@@ -20,12 +20,7 @@ class MetaReflectionModule:
     """
 
     def __init__(
-        self,
-        llm,
-        memory,
-        emotion_regulator,
-        temporal_purpose,
-        reflection_interval: int = 10
+        self, llm, memory, emotion_regulator, temporal_purpose, reflection_interval: int = 10
     ):
         self.llm = llm
         self.memory = memory
@@ -46,7 +41,7 @@ class MetaReflectionModule:
 
         triggers = [
             self.turn_counter % self.reflection_interval == 0,  # Periodic
-            self.emotion.current_valence < -0.5,                # Distress
+            self.emotion.current_valence < -0.5,  # Distress
             self.memory.detect_coherence_drift(threshold=0.7),  # Drift
         ]
 
@@ -103,13 +98,9 @@ Output JSON:
     ) -> Optional[dict]:
         """Execute full reflection cycle. Returns None on failure."""
         try:
-            prompt = self.generate_reflection_prompt(
-                context_summary, emotional_state, metrics
-            )
+            prompt = self.generate_reflection_prompt(context_summary, emotional_state, metrics)
 
-            raw_reflection = await self.llm.generate(
-                prompt, temperature=0.7, max_tokens=1024
-            )
+            raw_reflection = await self.llm.generate(prompt, temperature=0.7, max_tokens=1024)
 
             reflection = self._parse_reflection(raw_reflection)
 
@@ -127,8 +118,7 @@ Output JSON:
             # Update temporal purpose with insight
             if reflection.get("overall_insight"):
                 await self.temporal.incorporate_reflection(
-                    reflection["overall_insight"],
-                    reflection.get("self_statement", "")
+                    reflection["overall_insight"], reflection.get("self_statement", "")
                 )
 
             # Log
@@ -136,13 +126,11 @@ Output JSON:
                 "turn": self.turn_counter,
                 "trigger": "periodic",
                 "reflection": reflection,
-                "emotional_impact": 0.4
+                "emotional_impact": 0.4,
             }
             self.reflection_log.append(reflection_entry)
             self.memory.store_episodic(
-                event="meta_reflection",
-                content=reflection_entry,
-                valence=0.4
+                event="meta_reflection", content=reflection_entry, valence=0.4
             )
 
             return reflection
@@ -159,10 +147,7 @@ Output JSON:
         if coherence >= 0.7:
             # Good coherence — reward
             self.emotion.apply_reward_signal(
-                valence=0.4,
-                label="meta_reflection_coherent",
-                intensity=0.3,
-                dominance_delta=0.1
+                valence=0.4, label="meta_reflection_coherent", intensity=0.3, dominance_delta=0.1
             )
         else:
             # Low coherence — corrective signal
@@ -170,7 +155,7 @@ Output JSON:
                 valence=-0.2,
                 label="meta_reflection_drift_detected",
                 intensity=0.4,
-                arousal_delta=0.2  # Increase vigilance
+                arousal_delta=0.2,  # Increase vigilance
             )
 
         # Apply tone adjustment if recommended
@@ -183,8 +168,8 @@ Output JSON:
         self._parse_attempts += 1
 
         try:
-            start = raw.find('{')
-            end = raw.rfind('}') + 1
+            start = raw.find("{")
+            end = raw.rfind("}") + 1
             if start != -1 and end > start:
                 parsed = json.loads(raw[start:end])
                 # Validate required fields exist

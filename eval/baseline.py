@@ -43,6 +43,4 @@ class BaselineAgent:
 
     def _format_context(self, window: int = 20) -> str:
         recent = self.context[-window:]
-        return "\n".join(
-            f"{msg['role'].title()}: {msg['content']}" for msg in recent
-        )
+        return "\n".join(f"{msg['role'].title()}: {msg['content']}" for msg in recent)

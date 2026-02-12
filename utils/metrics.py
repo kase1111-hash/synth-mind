@@ -48,10 +48,7 @@ class MetricsTracker:
             self.user_sentiments.pop(0)
 
     def update_turn_metrics(
-        self,
-        alignment: float = None,
-        uncertainty: float = None,
-        flow_state: str = None
+        self, alignment: float = None, uncertainty: float = None, flow_state: str = None
     ):
         """Update all metrics for a turn."""
         if alignment is not None:
@@ -94,6 +91,7 @@ class MetricsTracker:
             return {"balanced": 1.0}
 
         from collections import Counter
+
         counts = Counter(self.flow_states[-20:])
         total = sum(counts.values())
         return {state: count / total for state, count in counts.items()}
@@ -104,13 +102,17 @@ class MetricsTracker:
             "dream_alignment": {
                 "current": self.last_dream_alignment,
                 "average": self.avg_dream_alignment(),
-                "trend": "positive" if len(self.dream_alignments) > 1 and
-                         self.dream_alignments[-1] > self.dream_alignments[-10] else "stable"
+                "trend": (
+                    "positive"
+                    if len(self.dream_alignments) > 1
+                    and self.dream_alignments[-1] > self.dream_alignments[-10]
+                    else "stable"
+                ),
             },
             "uncertainty": {
                 "average": self.avg_uncertainty(),
-                "assurance_success": self.assurance_success_rate()
+                "assurance_success": self.assurance_success_rate(),
             },
             "flow": self.flow_state_distribution(),
-            "user_sentiment": self.avg_user_sentiment()
+            "user_sentiment": self.avg_user_sentiment(),
         }

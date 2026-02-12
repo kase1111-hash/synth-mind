@@ -18,35 +18,35 @@ class MockLLM:
     async def generate(self, prompt, temperature=0.7, max_tokens=1000, system=None):
         """Return mock LLM response based on prompt content."""
         if "simulate" in prompt.lower() and "next user messages" in prompt.lower():
-            return '''[
+            return """[
                 {"text": "Can you explain that further?", "probability": 0.4},
                 {"text": "That sounds good, thanks!", "probability": 0.3},
                 {"text": "What about the edge cases?", "probability": 0.2},
                 {"text": "I'm not sure I understand.", "probability": 0.1}
-            ]'''
+            ]"""
         elif "meta-reflection" in prompt.lower() or "evaluate yourself" in prompt.lower():
-            return '''{
+            return """{
                 "coherence_score": 0.85,
                 "alignment_score": 0.9,
                 "issues_detected": [],
                 "recommended_adjustments": {"tone": "engaged", "focus": "clarity", "strategy": "continue"},
                 "self_statement": "Operating effectively",
                 "overall_insight": "Maintaining coherent dialogue"
-            }'''
+            }"""
         elif "self-narrative" in prompt.lower() or "narrative" in prompt.lower():
             return (
                 "I am an AI that has been reflecting on my interactions. "
                 "I have learned to be more attentive and empathetic."
             )
         elif "reformat" in prompt.lower() or "valid json" in prompt.lower():
-            return '''{
+            return """{
                 "coherence_score": 0.75,
                 "alignment_score": 0.8,
                 "issues_detected": [],
                 "recommended_adjustments": {},
                 "self_statement": "Reformatted",
                 "overall_insight": "Recovered from parse failure"
-            }'''
+            }"""
         return "Mock response"
 
 
@@ -62,16 +62,13 @@ class MockMemory:
     def embed(self, text):
         """Return mock embedding."""
         import numpy as np
+
         hash_val = hash(text) % 1000000
         rng = np.random.default_rng(hash_val)
         return rng.standard_normal(384)
 
     def store_episodic(self, event, content, valence=0.0):
-        self.episodic_store.append({
-            "event": event,
-            "content": content,
-            "valence": valence
-        })
+        self.episodic_store.append({"event": event, "content": content, "valence": valence})
 
     def store_persistent(self, key, value):
         self.persistent_store[key] = value
@@ -99,13 +96,16 @@ class MockEmotionRegulator:
         self.signals = []
         self.tone_adjustments = []
 
-    def apply_reward_signal(self, valence, label, intensity,
-                            arousal_delta=0.0, dominance_delta=0.0):
-        self.signals.append({
-            "valence": valence,
-            "label": label,
-            "intensity": intensity,
-        })
+    def apply_reward_signal(
+        self, valence, label, intensity, arousal_delta=0.0, dominance_delta=0.0
+    ):
+        self.signals.append(
+            {
+                "valence": valence,
+                "label": label,
+                "intensity": intensity,
+            }
+        )
         self.current_valence += valence * intensity * 0.1
 
     def adjust_tone(self, *args):
@@ -116,7 +116,7 @@ class MockEmotionRegulator:
             "valence": self.current_valence,
             "arousal": self.current_arousal,
             "dominance": self.current_dominance,
-            "tags": ["neutral"]
+            "tags": ["neutral"],
         }
 
     def get_current_state(self):
@@ -144,17 +144,19 @@ class MockTemporalPurpose:
 # Predictive Dreaming Tests
 # =============================================================================
 
+
 class TestPredictiveDreaming:
     """Tests for PredictiveDreamingModule."""
 
     @pytest.fixture
     def module(self):
         from psychological.predictive_dreaming import PredictiveDreamingModule
+
         return PredictiveDreamingModule(
             llm=MockLLM(),
             memory=MockMemory(),
             emotion_regulator=MockEmotionRegulator(),
-            reward_weight=0.5
+            reward_weight=0.5,
         )
 
     @pytest.mark.asyncio
@@ -176,8 +178,18 @@ class TestPredictiveDreaming:
         import numpy as np
 
         module.dream_buffer = [
-            {"text": "Thank you!", "prob": 0.5, "embedding": np.random.randn(384), "rewarded": False},
-            {"text": "Can you help?", "prob": 0.5, "embedding": np.random.randn(384), "rewarded": False}
+            {
+                "text": "Thank you!",
+                "prob": 0.5,
+                "embedding": np.random.randn(384),
+                "rewarded": False,
+            },
+            {
+                "text": "Can you help?",
+                "prob": 0.5,
+                "embedding": np.random.randn(384),
+                "rewarded": False,
+            },
         ]
 
         reward, alignment = module.resolve_dreams("Thank you so much!")
@@ -213,18 +225,20 @@ class TestPredictiveDreaming:
 # Meta Reflection Tests
 # =============================================================================
 
+
 class TestMetaReflection:
     """Tests for MetaReflectionModule."""
 
     @pytest.fixture
     def module(self):
         from psychological.meta_reflection import MetaReflectionModule
+
         return MetaReflectionModule(
             llm=MockLLM(),
             memory=MockMemory(),
             emotion_regulator=MockEmotionRegulator(),
             temporal_purpose=MockTemporalPurpose(),
-            reflection_interval=5
+            reflection_interval=5,
         )
 
     def test_should_reflect_periodic(self, module):
@@ -246,7 +260,7 @@ class TestMetaReflection:
         result = await module.perform_reflection(
             context_summary="Test conversation",
             emotional_state={"valence": 0.5, "arousal": 0.0, "dominance": 0.0, "tags": ["neutral"]},
-            metrics={"predictive_alignment": 0.7, "assurance_success": 0.8}
+            metrics={"predictive_alignment": 0.7, "assurance_success": 0.8},
         )
 
         assert result is not None
@@ -260,7 +274,7 @@ class TestMetaReflection:
         result = await module.run_cycle(
             context="Test",
             emotional_state={"valence": 0.5, "arousal": 0.0, "dominance": 0.0, "tags": []},
-            performance_metrics={}
+            performance_metrics={},
         )
 
         assert result is None
@@ -297,14 +311,16 @@ class TestMetaReflection:
 
     def test_get_corrective_instruction_on_low_coherence(self, module):
         """Test corrective instruction generated on low coherence."""
-        module.reflection_log.append({
-            "turn": 1,
-            "reflection": {
-                "coherence_score": 0.4,
-                "issues_detected": ["topic drift"],
-                "recommended_adjustments": {"strategy": "refocus"}
+        module.reflection_log.append(
+            {
+                "turn": 1,
+                "reflection": {
+                    "coherence_score": 0.4,
+                    "issues_detected": ["topic drift"],
+                    "recommended_adjustments": {"strategy": "refocus"},
+                },
             }
-        })
+        )
 
         instruction = module.get_corrective_instruction()
         assert instruction is not None
@@ -316,36 +332,36 @@ class TestMetaReflection:
 # Reward Calibration Tests
 # =============================================================================
 
+
 class TestRewardCalibration:
     """Tests for RewardCalibrationModule."""
 
     @pytest.fixture
     def dreaming(self):
         from psychological.predictive_dreaming import PredictiveDreamingModule
+
         return PredictiveDreamingModule(
-            llm=MockLLM(),
-            memory=MockMemory(),
-            emotion_regulator=MockEmotionRegulator()
+            llm=MockLLM(), memory=MockMemory(), emotion_regulator=MockEmotionRegulator()
         )
 
     @pytest.fixture
     def assurance(self):
         from psychological.assurance_resolution import AssuranceResolutionModule
+
         return AssuranceResolutionModule(
-            llm=MockLLM(),
-            memory=MockMemory(),
-            emotion_regulator=MockEmotionRegulator()
+            llm=MockLLM(), memory=MockMemory(), emotion_regulator=MockEmotionRegulator()
         )
 
     @pytest.fixture
     def module(self, dreaming, assurance):
         from psychological.reward_calibration import RewardCalibrationModule
+
         return RewardCalibrationModule(
             emotion_regulator=MockEmotionRegulator(),
             memory=MockMemory(),
             predictive_dreaming=dreaming,
             assurance_module=assurance,
-            target_flow_range=(0.4, 0.7)
+            target_flow_range=(0.4, 0.7),
         )
 
     def test_estimate_task_difficulty(self, module):
@@ -415,12 +431,14 @@ class TestRewardCalibration:
 # Emotion Regulator Tests
 # =============================================================================
 
+
 class TestEmotionRegulator:
     """Tests for EmotionRegulator utility (PAD model)."""
 
     @pytest.fixture
     def regulator(self):
         from utils.emotion_regulator import EmotionRegulator
+
         return EmotionRegulator()
 
     def test_initial_state(self, regulator):
@@ -440,11 +458,7 @@ class TestEmotionRegulator:
         initial_valence = regulator.current_valence
         initial_arousal = regulator.current_arousal
 
-        regulator.apply_reward_signal(
-            valence=0.5,
-            label="test_reward",
-            intensity=0.8
-        )
+        regulator.apply_reward_signal(valence=0.5, label="test_reward", intensity=0.8)
 
         # Valence should have changed
         assert regulator.current_valence != initial_valence
@@ -454,8 +468,7 @@ class TestEmotionRegulator:
     def test_apply_reward_signal_with_arousal_delta(self, regulator):
         """Test explicit arousal_delta is used instead of automatic."""
         regulator.apply_reward_signal(
-            valence=0.5, label="test", intensity=1.0,
-            arousal_delta=-0.5  # Explicitly lower arousal
+            valence=0.5, label="test", intensity=1.0, arousal_delta=-0.5  # Explicitly lower arousal
         )
 
         assert regulator.current_arousal < 0  # Should have decreased
@@ -525,16 +538,16 @@ class TestEmotionRegulator:
 # Assurance Resolution Tests
 # =============================================================================
 
+
 class TestAssuranceResolution:
     """Tests for AssuranceResolutionModule."""
 
     @pytest.fixture
     def module(self):
         from psychological.assurance_resolution import AssuranceResolutionModule
+
         return AssuranceResolutionModule(
-            llm=MockLLM(),
-            memory=MockMemory(),
-            emotion_regulator=MockEmotionRegulator()
+            llm=MockLLM(), memory=MockMemory(), emotion_regulator=MockEmotionRegulator()
         )
 
     def test_assurance_success_rate_starts_at_zero(self, module):

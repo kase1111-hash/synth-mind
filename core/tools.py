@@ -10,8 +10,6 @@ Available Tools:
 import asyncio
 import json
 import multiprocessing
-import re
-import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -45,20 +43,20 @@ class ToolManager:
             "calculator": {
                 "description": "Evaluate mathematical expressions safely",
                 "params": {"expression": "Mathematical expression to evaluate"},
-                "example": "calculator(expression='2 + 2 * 3')"
+                "example": "calculator(expression='2 + 2 * 3')",
             },
             "code_execute": {
                 "description": "Execute Python code in a sandbox",
                 "params": {"code": "Python code to execute"},
-                "example": "code_execute(code='print(sum(range(10)))')"
+                "example": "code_execute(code='print(sum(range(10)))')",
             },
             "json_parse": {
                 "description": "Parse JSON and extract data using path",
                 "params": {
                     "data": "JSON string or dict",
-                    "path": "Dot-notation path (e.g., 'users.0.name')"
+                    "path": "Dot-notation path (e.g., 'users.0.name')",
                 },
-                "example": "json_parse(data='{\"a\": 1}', path='a')"
+                "example": "json_parse(data='{\"a\": 1}', path='a')",
             },
         }
 
@@ -154,7 +152,7 @@ class ToolManager:
 
         try:
             # Parse expression into AST
-            tree = ast.parse(expression, mode='eval')
+            tree = ast.parse(expression, mode="eval")
             result = safe_eval(tree)
             return {"success": True, "result": result, "expression": expression}
         except SyntaxError as e:
@@ -179,17 +177,12 @@ class ToolManager:
         try:
             compile(code, "<sandbox>", "exec")
         except SyntaxError as e:
-            return {
-                "success": False,
-                "error": f"Syntax error: {e}",
-                "line": e.lineno
-            }
+            return {"success": False, "error": f"Syntax error: {e}", "line": e.lineno}
 
         # Use multiprocessing to enforce timeout
         result_queue = multiprocessing.Queue()
         process = multiprocessing.Process(
-            target=self._sandbox_worker,
-            args=(code, result_queue, self.MAX_OUTPUT_LENGTH)
+            target=self._sandbox_worker, args=(code, result_queue, self.MAX_OUTPUT_LENGTH)
         )
 
         try:
@@ -206,23 +199,17 @@ class ToolManager:
                 return {
                     "success": False,
                     "error": f"Execution timed out after {self.MAX_CODE_EXECUTION_TIME} seconds",
-                    "timed_out": True
+                    "timed_out": True,
                 }
 
             # Get result from queue
             if not result_queue.empty():
                 return result_queue.get_nowait()
             else:
-                return {
-                    "success": False,
-                    "error": "No result returned from sandbox"
-                }
+                return {"success": False, "error": "No result returned from sandbox"}
 
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Sandbox error: {type(e).__name__}: {str(e)}"
-            }
+            return {"success": False, "error": f"Sandbox error: {type(e).__name__}: {str(e)}"}
         finally:
             if process.is_alive():
                 process.kill()
@@ -247,19 +234,51 @@ class ToolManager:
 
         # Restricted builtins - no dangerous operations
         safe_builtins = {
-            "abs": abs, "all": all, "any": any, "bin": bin,
-            "bool": bool, "chr": chr, "dict": dict, "dir": dir,
-            "divmod": divmod, "enumerate": enumerate, "filter": filter,
-            "float": float, "format": format, "frozenset": frozenset,
-            "hash": hash, "hex": hex, "int": int, "isinstance": isinstance,
-            "issubclass": issubclass, "iter": iter, "len": len,
-            "list": list, "map": map, "max": max, "min": min,
-            "next": next, "oct": oct, "ord": ord, "pow": pow,
-            "print": print, "range": range, "repr": repr, "reversed": reversed,
-            "round": round, "set": set, "slice": slice, "sorted": sorted,
-            "str": str, "sum": sum, "tuple": tuple, "type": type,
+            "abs": abs,
+            "all": all,
+            "any": any,
+            "bin": bin,
+            "bool": bool,
+            "chr": chr,
+            "dict": dict,
+            "dir": dir,
+            "divmod": divmod,
+            "enumerate": enumerate,
+            "filter": filter,
+            "float": float,
+            "format": format,
+            "frozenset": frozenset,
+            "hash": hash,
+            "hex": hex,
+            "int": int,
+            "isinstance": isinstance,
+            "issubclass": issubclass,
+            "iter": iter,
+            "len": len,
+            "list": list,
+            "map": map,
+            "max": max,
+            "min": min,
+            "next": next,
+            "oct": oct,
+            "ord": ord,
+            "pow": pow,
+            "print": print,
+            "range": range,
+            "repr": repr,
+            "reversed": reversed,
+            "round": round,
+            "set": set,
+            "slice": slice,
+            "sorted": sorted,
+            "str": str,
+            "sum": sum,
+            "tuple": tuple,
+            "type": type,
             "zip": zip,
-            "True": True, "False": False, "None": None,
+            "True": True,
+            "False": False,
+            "None": None,
         }
 
         # Safe modules only
@@ -289,7 +308,7 @@ class ToolManager:
         restricted_globals = {
             "__builtins__": safe_builtins,
             "__name__": "__sandbox__",
-            **safe_modules
+            **safe_modules,
         }
 
         stdout_capture = io.StringIO()
@@ -300,25 +319,22 @@ class ToolManager:
             with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
                 exec(compiled, restricted_globals)
 
-            result_queue.put({
-                "success": True,
-                "stdout": stdout_capture.getvalue()[:max_output],
-                "stderr": stderr_capture.getvalue()[:max_output],
-                "has_output": bool(stdout_capture.getvalue() or stderr_capture.getvalue())
-            })
+            result_queue.put(
+                {
+                    "success": True,
+                    "stdout": stdout_capture.getvalue()[:max_output],
+                    "stderr": stderr_capture.getvalue()[:max_output],
+                    "has_output": bool(stdout_capture.getvalue() or stderr_capture.getvalue()),
+                }
+            )
         except Exception as e:
-            result_queue.put({
-                "success": False,
-                "error": f"{type(e).__name__}: {str(e)}"
-            })
+            result_queue.put({"success": False, "error": f"{type(e).__name__}: {str(e)}"})
 
     # ============================================
     # JSON Parser
     # ============================================
 
-    def _json_parse(
-        self, data: str | dict, path: str = ""
-    ) -> dict[str, Any]:
+    def _json_parse(self, data: str | dict, path: str = "") -> dict[str, Any]:
         """
         Parse JSON and extract data using dot notation.
         Path examples: 'users.0.name', 'config.settings.theme'
@@ -331,7 +347,7 @@ class ToolManager:
 
             if path:
                 result = parsed
-                for key in path.split('.'):
+                for key in path.split("."):
                     if isinstance(result, dict):
                         result = result[key]
                     elif isinstance(result, list):
@@ -339,7 +355,7 @@ class ToolManager:
                     else:
                         return {
                             "success": False,
-                            "error": f"Cannot traverse into {type(result).__name__}"
+                            "error": f"Cannot traverse into {type(result).__name__}",
                         }
             else:
                 result = parsed
@@ -348,7 +364,7 @@ class ToolManager:
                 "success": True,
                 "path": path or "(root)",
                 "result": result,
-                "type": type(result).__name__
+                "type": type(result).__name__,
             }
 
         except json.JSONDecodeError as e:
@@ -368,7 +384,7 @@ class ToolManager:
             return {
                 "success": False,
                 "error": f"Tool '{tool_name}' not found",
-                "available_tools": list(self.available_tools.keys())
+                "available_tools": list(self.available_tools.keys()),
             }
 
         try:
@@ -380,13 +396,10 @@ class ToolManager:
                 "success": False,
                 "error": f"Invalid arguments: {e}",
                 "expected_params": desc.get("params", {}),
-                "example": desc.get("example", "")
+                "example": desc.get("example", ""),
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Tool execution failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Tool execution failed: {str(e)}"}
 
     async def execute_async(self, tool_name: str, **kwargs) -> dict[str, Any]:
         """Execute a tool asynchronously (runs in thread pool)."""
@@ -407,17 +420,12 @@ class ToolManager:
         return self.tool_descriptions.copy()
 
     def register_tool(
-        self,
-        name: str,
-        func,
-        description: str,
-        params: dict[str, str],
-        example: str
+        self, name: str, func, description: str, params: dict[str, str], example: str
     ):
         """Register a custom tool."""
         self.available_tools[name] = func
         self.tool_descriptions[name] = {
             "description": description,
             "params": params,
-            "example": example
+            "example": example,
         }

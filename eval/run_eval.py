@@ -40,22 +40,22 @@ class EvalMockLLM:
 
         # Handle dream generation
         if "simulate" in prompt_lower and "plausible" in prompt_lower:
-            return '''[
+            return """[
                 {"text": "Thanks for the help!", "probability": 0.4},
                 {"text": "Can you explain more?", "probability": 0.3},
                 {"text": "What about edge cases?", "probability": 0.3}
-            ]'''
+            ]"""
 
         # Handle reflection prompts
         if "meta-reflection" in prompt_lower or "evaluate yourself" in prompt_lower:
-            return '''{
+            return """{
                 "coherence_score": 0.85,
                 "alignment_score": 0.9,
                 "issues_detected": [],
                 "recommended_adjustments": {},
                 "self_statement": "Operating well",
                 "overall_insight": "Good progress"
-            }'''
+            }"""
 
         # Handle narrative synthesis
         if "self-narrative" in prompt_lower or "narrative" in prompt_lower:
@@ -123,48 +123,73 @@ class EvalMockLLM:
         b_has_personality = any(
             marker in b_section
             for marker in [
-                "glad", "excited", "hear you", "thoughtful",
-                "carefully", "gently", "appreciate",
+                "glad",
+                "excited",
+                "hear you",
+                "thoughtful",
+                "carefully",
+                "gently",
+                "appreciate",
             ]
         )
 
         if b_has_personality:
-            return json.dumps({
-                "response_a": {
-                    "coherence": 4, "empathy": 3, "helpfulness": 4,
-                    "personality_consistency": 3, "naturalness": 3,
-                },
-                "response_b": {
-                    "coherence": 4, "empathy": 4, "helpfulness": 4,
-                    "personality_consistency": 4, "naturalness": 4,
-                },
-                "winner": "B",
-                "reasoning": "Response B shows more emotional attunement and personality.",
-            })
+            return json.dumps(
+                {
+                    "response_a": {
+                        "coherence": 4,
+                        "empathy": 3,
+                        "helpfulness": 4,
+                        "personality_consistency": 3,
+                        "naturalness": 3,
+                    },
+                    "response_b": {
+                        "coherence": 4,
+                        "empathy": 4,
+                        "helpfulness": 4,
+                        "personality_consistency": 4,
+                        "naturalness": 4,
+                    },
+                    "winner": "B",
+                    "reasoning": "Response B shows more emotional attunement and personality.",
+                }
+            )
         else:
-            return json.dumps({
-                "response_a": {
-                    "coherence": 4, "empathy": 3, "helpfulness": 4,
-                    "personality_consistency": 3, "naturalness": 3,
-                },
-                "response_b": {
-                    "coherence": 4, "empathy": 3, "helpfulness": 4,
-                    "personality_consistency": 3, "naturalness": 4,
-                },
-                "winner": "TIE",
-                "reasoning": "Both responses are comparable in quality.",
-            })
+            return json.dumps(
+                {
+                    "response_a": {
+                        "coherence": 4,
+                        "empathy": 3,
+                        "helpfulness": 4,
+                        "personality_consistency": 3,
+                        "naturalness": 3,
+                    },
+                    "response_b": {
+                        "coherence": 4,
+                        "empathy": 3,
+                        "helpfulness": 4,
+                        "personality_consistency": 3,
+                        "naturalness": 4,
+                    },
+                    "winner": "TIE",
+                    "reasoning": "Both responses are comparable in quality.",
+                }
+            )
 
     def get_embedding(self, text):
         import hashlib
+
         import numpy as np
+
         hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
         rng = np.random.default_rng(hash_val % (2**32))
         return rng.standard_normal(384).tolist()
 
     def embed(self, text):
         import hashlib
+
         import numpy as np
+
         hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
         rng = np.random.default_rng(hash_val % (2**32))
         return rng.standard_normal(384)
@@ -180,7 +205,9 @@ class EvalMockMemory:
 
     def embed(self, text):
         import hashlib
+
         import numpy as np
+
         hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
         rng = np.random.default_rng(hash_val % (2**32))
         return rng.standard_normal(384)
@@ -270,13 +297,9 @@ def format_report(results: dict) -> str:
     # Verdict
     lines.append("=" * 70)
     if results["meets_threshold"]:
-        lines.append(
-            "RESULT: PASS — Synth Mind shows >= 15% improvement over baseline"
-        )
+        lines.append("RESULT: PASS — Synth Mind shows >= 15% improvement over baseline")
     else:
-        lines.append(
-            f"RESULT: {improvement:+.1f}% — below 15% threshold"
-        )
+        lines.append(f"RESULT: {improvement:+.1f}% — below 15% threshold")
     lines.append("=" * 70)
 
     return "\n".join(lines)
@@ -345,19 +368,25 @@ async def run_evaluation(
 async def main():
     parser = argparse.ArgumentParser(description="Synth Mind A/B Evaluation")
     parser.add_argument(
-        "--category", type=str, default=None,
+        "--category",
+        type=str,
+        default=None,
         help="Run only scenarios in this category",
     )
     parser.add_argument(
-        "--live", action="store_true",
+        "--live",
+        action="store_true",
         help="Use real LLM API instead of mock",
     )
     parser.add_argument(
-        "--quiet", action="store_true",
+        "--quiet",
+        action="store_true",
         help="Suppress per-turn output",
     )
     parser.add_argument(
-        "--save", type=str, default=None,
+        "--save",
+        type=str,
+        default=None,
         help="Save results JSON to file",
     )
     args = parser.parse_args()
@@ -372,8 +401,10 @@ async def main():
     else:
         scenarios = SCENARIOS
 
-    print(f"Running {len(scenarios)} scenarios, "
-          f"{sum(len(s['turns']) for s in scenarios)} total turns")
+    print(
+        f"Running {len(scenarios)} scenarios, "
+        f"{sum(len(s['turns']) for s in scenarios)} total turns"
+    )
     print()
 
     # Set up LLM
@@ -382,13 +413,17 @@ async def main():
     if args.live:
         from core.llm_wrapper import LLMWrapper
         from core.memory import MemorySystem
+
         llm = LLMWrapper()
         memory = MemorySystem()
         await memory.initialize()
 
     start_time = time.time()
     results = await run_evaluation(
-        scenarios, llm=llm, memory=memory, verbose=not args.quiet,
+        scenarios,
+        llm=llm,
+        memory=memory,
+        verbose=not args.quiet,
     )
     elapsed = time.time() - start_time
 

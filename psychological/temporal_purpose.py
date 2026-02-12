@@ -20,11 +20,7 @@ class TemporalPurposeEngine:
     """
 
     def __init__(
-        self,
-        memory,
-        emotion_regulator,
-        llm=None,
-        initial_narrative: Optional[str] = None
+        self, memory, emotion_regulator, llm=None, initial_narrative: Optional[str] = None
     ):
         self.memory = memory
         self.emotion = emotion_regulator
@@ -44,7 +40,7 @@ class TemporalPurposeEngine:
             "user_helpfulness_score": 0.0,
             "predictive_alignment_avg": 0.0,
             "assurance_success_rate": 0.0,
-            "growth_delta": 0.0
+            "growth_delta": 0.0,
         }
 
         # Load from memory if exists
@@ -74,10 +70,9 @@ class TemporalPurposeEngine:
         """Update metrics at session end or periodically."""
         self.purpose_metrics["sessions_completed"] += 1
 
-        self.purpose_metrics["user_helpfulness_score"] = (
-            0.9 * self.purpose_metrics["user_helpfulness_score"] +
-            0.1 * session_summary.get("avg_user_sentiment", 0.5)
-        )
+        self.purpose_metrics["user_helpfulness_score"] = 0.9 * self.purpose_metrics[
+            "user_helpfulness_score"
+        ] + 0.1 * session_summary.get("avg_user_sentiment", 0.5)
 
         self.purpose_metrics["predictive_alignment_avg"] = session_summary.get(
             "avg_dream_alignment", 0.5
@@ -87,9 +82,9 @@ class TemporalPurposeEngine:
         )
 
         current_growth = (
-            self.purpose_metrics["predictive_alignment_avg"] +
-            self.purpose_metrics["assurance_success_rate"] +
-            self.purpose_metrics["user_helpfulness_score"]
+            self.purpose_metrics["predictive_alignment_avg"]
+            + self.purpose_metrics["assurance_success_rate"]
+            + self.purpose_metrics["user_helpfulness_score"]
         ) / 3
 
         prev_growth = self.purpose_metrics["growth_delta"]
@@ -103,8 +98,6 @@ class TemporalPurposeEngine:
         Falls back to simple concatenation if LLM is unavailable.
         """
         self.purpose_metrics["reflective_insights"] += 1
-
-        old_narrative = self.narrative_summary
 
         if self.llm:
             # Use LLM to synthesize a coherent updated narrative
@@ -127,9 +120,7 @@ Write an updated self-narrative (max 300 words) that:
 Output ONLY the new narrative text, nothing else."""
 
             try:
-                new_narrative = await self.llm.generate(
-                    prompt, temperature=0.6, max_tokens=400
-                )
+                new_narrative = await self.llm.generate(prompt, temperature=0.6, max_tokens=400)
                 # Basic sanity check
                 if len(new_narrative.strip()) > 20:
                     self.narrative_summary = new_narrative.strip()
@@ -141,34 +132,31 @@ Output ONLY the new narrative text, nothing else."""
             self._fallback_incorporate(insight)
 
         # Store narrative version for drift analysis
-        self.narrative_versions.append({
-            "timestamp": time.time(),
-            "narrative": self.narrative_summary,
-            "trigger_insight": insight,
-        })
+        self.narrative_versions.append(
+            {
+                "timestamp": time.time(),
+                "narrative": self.narrative_summary,
+                "trigger_insight": insight,
+            }
+        )
         # Keep last 20 versions
         if len(self.narrative_versions) > 20:
             self.narrative_versions.pop(0)
 
         # Update embedding
-        self.self_schema_embedding = self.memory.embed(
-            self.narrative_summary + " " + insight
-        )
+        self.self_schema_embedding = self.memory.embed(self.narrative_summary + " " + insight)
 
         # Persist
         self.memory.store_persistent("narrative_summary", self.narrative_summary)
         if self.self_schema_embedding is not None:
             embedding_list = self.self_schema_embedding
-            if hasattr(embedding_list, 'tolist'):
+            if hasattr(embedding_list, "tolist"):
                 embedding_list = embedding_list.tolist()
             self.memory.store_persistent("self_schema_embedding", embedding_list)
 
         # Emotional reward for growth
         self.emotion.apply_reward_signal(
-            valence=0.3,
-            label="narrative_evolution",
-            intensity=0.3,
-            dominance_delta=0.1
+            valence=0.3, label="narrative_evolution", intensity=0.3, dominance_delta=0.1
         )
 
     def _fallback_incorporate(self, insight: str):
@@ -195,7 +183,7 @@ Output ONLY the new narrative text, nothing else."""
             return False
 
         current = self.self_schema_embedding
-        if hasattr(current, '__len__') and hasattr(oldest_embedding, '__len__'):
+        if hasattr(current, "__len__") and hasattr(oldest_embedding, "__len__"):
             similarity = np.dot(current, oldest_embedding) / (
                 np.linalg.norm(current) * np.linalg.norm(oldest_embedding) + 1e-10
             )
@@ -223,18 +211,16 @@ Output ONLY the new narrative text, nothing else."""
 
     def add_milestone(self, event_description: str):
         """Mark significant achievement."""
-        self.milestones.append({
-            "turn": getattr(self.memory, 'current_turn', 0),
-            "event": event_description,
-            "narrative_at_time": self.narrative_summary,
-            "timestamp": time.time()
-        })
-
-        self.emotion.apply_reward_signal(
-            valence=0.8,
-            label="milestone_achieved",
-            intensity=0.7
+        self.milestones.append(
+            {
+                "turn": getattr(self.memory, "current_turn", 0),
+                "event": event_description,
+                "narrative_at_time": self.narrative_summary,
+                "timestamp": time.time(),
+            }
         )
+
+        self.emotion.apply_reward_signal(valence=0.8, label="milestone_achieved", intensity=0.7)
 
     def run_cycle(self, session_ended: bool = False, session_summary: Optional[dict] = None):
         """Main orchestration hook."""

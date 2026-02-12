@@ -32,9 +32,7 @@ class SynthAgent:
         self.dreaming = PredictiveDreamingModule(llm, memory, self.emotion)
         self.assurance = AssuranceResolutionModule(llm, memory, self.emotion)
         self.temporal = TemporalPurposeEngine(memory, self.emotion, llm=llm)
-        self.reflection = MetaReflectionModule(
-            llm, memory, self.emotion, self.temporal
-        )
+        self.reflection = MetaReflectionModule(llm, memory, self.emotion, self.temporal)
         self.calibration = RewardCalibrationModule(
             self.emotion, memory, self.dreaming, self.assurance
         )
@@ -131,9 +129,7 @@ class SynthAgent:
 
         # Dream predictions
         if self.dreaming.dream_buffer:
-            top_dream = max(
-                self.dreaming.dream_buffer, key=lambda d: d["prob"]
-            )
+            top_dream = max(self.dreaming.dream_buffer, key=lambda d: d["prob"])
             sections.append(
                 f"You anticipated the user might say something like: "
                 f"'{top_dream['text'][:100]}'. Adapt if reality differs."
@@ -152,10 +148,7 @@ class SynthAgent:
                 "Be more careful, ask clarifying questions, hedge appropriately."
             )
         elif recent_uncertainty < 0.3:
-            sections.append(
-                "You are confident in recent interactions. "
-                "Be direct and helpful."
-            )
+            sections.append("You are confident in recent interactions. " "Be direct and helpful.")
 
         return "\n\n".join(sections)
 
@@ -164,24 +157,14 @@ class SynthAgent:
         self.context = []
         self.turn_count = 0
         self.emotion = EmotionRegulator()
-        self.dreaming = PredictiveDreamingModule(
-            self.llm, self.memory, self.emotion
-        )
-        self.assurance = AssuranceResolutionModule(
-            self.llm, self.memory, self.emotion
-        )
-        self.temporal = TemporalPurposeEngine(
-            self.memory, self.emotion, llm=self.llm
-        )
-        self.reflection = MetaReflectionModule(
-            self.llm, self.memory, self.emotion, self.temporal
-        )
+        self.dreaming = PredictiveDreamingModule(self.llm, self.memory, self.emotion)
+        self.assurance = AssuranceResolutionModule(self.llm, self.memory, self.emotion)
+        self.temporal = TemporalPurposeEngine(self.memory, self.emotion, llm=self.llm)
+        self.reflection = MetaReflectionModule(self.llm, self.memory, self.emotion, self.temporal)
         self.calibration = RewardCalibrationModule(
             self.emotion, self.memory, self.dreaming, self.assurance
         )
 
     def _format_context(self, window: int = 20) -> str:
         recent = self.context[-window:]
-        return "\n".join(
-            f"{msg['role'].title()}: {msg['content']}" for msg in recent
-        )
+        return "\n".join(f"{msg['role'].title()}: {msg['content']}" for msg in recent)

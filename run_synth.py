@@ -5,7 +5,6 @@ A psychologically grounded AI agent with full cognitive substrate.
 """
 
 import asyncio
-import os
 import sys
 
 from core.orchestrator import SynthOrchestrator
@@ -38,6 +37,7 @@ def print_banner():
 
     """
     print(banner)
+
 
 async def main():
     """Main async entry point."""
@@ -76,6 +76,7 @@ async def main():
     finally:
         await orchestrator.shutdown()
         print("Synth has been saved. Until next time, co-creator.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

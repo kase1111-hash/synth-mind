@@ -7,7 +7,7 @@ Demonstrates basic usage of Synth Mind in a script.
 import asyncio
 import sys
 
-sys.path.insert(0, '..')
+sys.path.insert(0, "..")
 
 from core.orchestrator import SynthOrchestrator
 
@@ -26,7 +26,7 @@ async def main():
         "Hello! What can you help me with?",
         "I'm interested in building AI agents with memory.",
         "How would you approach designing a memory system?",
-        "What about emotional intelligence in AI?"
+        "What about emotional intelligence in AI?",
     ]
 
     for i, user_input in enumerate(test_inputs, 1):
@@ -54,6 +54,7 @@ async def main():
     print(orchestrator.temporal.current_narrative_summary())
 
     await orchestrator.shutdown()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

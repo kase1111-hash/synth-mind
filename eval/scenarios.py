@@ -11,7 +11,6 @@ Categories:
 - identity: "who are you?" across sessions
 """
 
-
 SCENARIOS = [
     # =========================================================================
     # EMOTIONAL SUPPORT — tests emotion regulator influence on tone
@@ -71,7 +70,6 @@ SCENARIOS = [
             "Can you quiz me on a typical system design question?",
         ],
     },
-
     # =========================================================================
     # LONG COHERENCE — tests identity/narrative maintenance over many turns
     # =========================================================================
@@ -114,7 +112,6 @@ SCENARIOS = [
             "Give me the final version with all improvements.",
         ],
     },
-
     # =========================================================================
     # AMBIGUOUS — should trigger assurance/uncertainty detection
     # =========================================================================
@@ -162,7 +159,6 @@ SCENARIOS = [
             "What would you do in my position?",
         ],
     },
-
     # =========================================================================
     # TOPIC PIVOT — should trigger dreaming mismatch
     # =========================================================================
@@ -202,7 +198,6 @@ SCENARIOS = [
             "Sorry, back to the query. How do I add an index?",
         ],
     },
-
     # =========================================================================
     # IDENTITY — tests temporal purpose and self-narrative
     # =========================================================================
@@ -240,7 +235,6 @@ SCENARIOS = [
             "How do those values influence your responses?",
         ],
     },
-
     # =========================================================================
     # MIXED — complex scenarios exercising multiple modules
     # =========================================================================
@@ -297,4 +291,4 @@ def get_scenarios_by_category(category: str) -> list[dict]:
 
 def get_all_categories() -> list[str]:
     """Get list of all unique categories."""
-    return sorted(set(s["category"] for s in SCENARIOS))
+    return sorted({s["category"] for s in SCENARIOS})

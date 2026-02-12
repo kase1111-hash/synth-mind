@@ -82,25 +82,18 @@ class SynthOrchestrator:
         self.metrics = MetricsTracker()
 
         # Initialize psychological modules
-        self.dreaming = PredictiveDreamingModule(
-            self.llm, self.memory, self.emotion
-        )
+        self.dreaming = PredictiveDreamingModule(self.llm, self.memory, self.emotion)
 
         mandelbrot_config = self.personality_config.get("mandelbrot_weighting", {})
 
         self.assurance = AssuranceResolutionModule(
-            self.llm, self.memory, self.emotion,
-            mandelbrot_config=mandelbrot_config
+            self.llm, self.memory, self.emotion, mandelbrot_config=mandelbrot_config
         )
 
         # TemporalPurpose now receives LLM for narrative synthesis
-        self.temporal = TemporalPurposeEngine(
-            self.memory, self.emotion, llm=self.llm
-        )
+        self.temporal = TemporalPurposeEngine(self.memory, self.emotion, llm=self.llm)
 
-        self.reflection = MetaReflectionModule(
-            self.llm, self.memory, self.emotion, self.temporal
-        )
+        self.reflection = MetaReflectionModule(self.llm, self.memory, self.emotion, self.temporal)
 
         self.calibration = RewardCalibrationModule(
             self.emotion, self.memory, self.dreaming, self.assurance
@@ -137,7 +130,7 @@ class SynthOrchestrator:
 
         # 4. Dream predictions context — what you anticipated
         if self.dreaming.dream_buffer:
-            top_dream = max(self.dreaming.dream_buffer, key=lambda d: d['prob'])
+            top_dream = max(self.dreaming.dream_buffer, key=lambda d: d["prob"])
             sections.append(
                 f"You anticipated the user might say something like: "
                 f"'{top_dream['text'][:100]}'. Adapt if reality differs."
@@ -149,7 +142,7 @@ class SynthOrchestrator:
             sections.append(f"Self-correction: {corrective}")
         elif self.reflection.reflection_log:
             last = self.reflection.reflection_log[-1]
-            insight = last.get('reflection', {}).get('overall_insight', '')
+            insight = last.get("reflection", {}).get("overall_insight", "")
             if insight:
                 sections.append(f"Recent self-insight: {insight}")
 
@@ -161,10 +154,7 @@ class SynthOrchestrator:
                 "Be more careful, ask clarifying questions, hedge appropriately."
             )
         elif recent_uncertainty < 0.3:
-            sections.append(
-                "You are confident in recent interactions. "
-                "Be direct and helpful."
-            )
+            sections.append("You are confident in recent interactions. " "Be direct and helpful.")
 
         return "\n\n".join(sections)
 
@@ -202,7 +192,7 @@ class SynthOrchestrator:
             if not user_input.strip():
                 continue
 
-            if user_input.startswith('/'):
+            if user_input.startswith("/"):
                 await self._handle_command(user_input)
                 continue
 
@@ -234,15 +224,12 @@ class SynthOrchestrator:
 
         # 5. Generate draft response with psychological context
         draft_response = await self.llm.generate(
-            context_str,
-            temperature=effective_temp,
-            system=system_prompt
+            context_str, temperature=effective_temp, system=system_prompt
         )
 
         # 6. Run Assurance cycle
         uncertainty, _ = self.assurance.run_cycle(
-            draft_response, context_str, {},
-            user_message=user_input
+            draft_response, context_str, {}, user_message=user_input
         )
 
         # 7. Meta-cognitive refinement (if needed)
@@ -255,9 +242,7 @@ class SynthOrchestrator:
 
         # 8. Check for meta-reflection trigger
         reflection_result = await self.reflection.run_cycle(
-            context_str,
-            self.emotion.current_state(),
-            self._gather_metrics()
+            context_str, self.emotion.current_state(), self._gather_metrics()
         )
 
         if reflection_result and reflection_result.get("coherence_score", 1.0) < 0.6:
@@ -283,12 +268,10 @@ class SynthOrchestrator:
         self.metrics.update_turn_metrics(
             alignment=self.metrics.last_dream_alignment,
             uncertainty=uncertainty,
-            flow_state=calib_state["state"]
+            flow_state=calib_state["state"],
         )
 
-    async def _metacognitive_refine(
-        self, draft: str, user_input: str, context: str
-    ) -> str:
+    async def _metacognitive_refine(self, draft: str, user_input: str, context: str) -> str:
         """Internal monologue — critique and refine the draft."""
         current_mood = self.emotion.get_current_state()
 
@@ -330,7 +313,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         return {
             "predictive_alignment": self.metrics.avg_dream_alignment(),
             "assurance_success": self.metrics.assurance_success_rate(),
-            "user_sentiment": self.metrics.avg_user_sentiment()
+            "user_sentiment": self.metrics.avg_user_sentiment(),
         }
 
     # =========================================================================
@@ -345,9 +328,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             self._print_state()
         elif cmd == "/reflect":
             result = await self.reflection.run_cycle(
-                self._format_context(),
-                self.emotion.current_state(),
-                self._gather_metrics()
+                self._format_context(), self.emotion.current_state(), self._gather_metrics()
             )
             print(f"\nReflection: {json.dumps(result, indent=2)}\n")
         elif cmd == "/dream":
@@ -374,32 +355,32 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
     def _print_tools(self):
         """Display available tools."""
         tools = self.tools.get_all_tool_info()
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("AVAILABLE TOOLS")
-        print("="*60)
+        print("=" * 60)
         for name, info in tools.items():
             print(f"\n  {name}")
             print(f"   {info['description']}")
-            params = ", ".join(f"{k}={v}" for k, v in info['params'].items())
+            params = ", ".join(f"{k}={v}" for k, v in info["params"].items())
             print(f"   Params: {params}")
             print(f"   Example: /tool {info['example']}")
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("Usage: /tool <tool_name>(<args>)")
         print("Example: /tool calculator(expression='2 + 2')")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
     async def _execute_tool(self, tool_call: str):
         """Execute a tool from command line."""
         import re
 
-        match = re.match(r'(\w+)\((.*)\)', tool_call, re.DOTALL)
+        match = re.match(r"(\w+)\((.*)\)", tool_call, re.DOTALL)
         if not match:
             parts = tool_call.split(maxsplit=1)
             if len(parts) == 2:
                 tool_name = parts[0]
                 info = self.tools.get_tool_info(tool_name)
-                if info and info['params']:
-                    first_param = list(info['params'].keys())[0]
+                if info and info["params"]:
+                    first_param = list(info["params"].keys())[0]
                     kwargs = {first_param: parts[1]}
                     result = self.tools.execute(tool_name, **kwargs)
                     self._print_tool_result(tool_name, result)
@@ -417,13 +398,13 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             for arg_match in re.finditer(r"(\w+)\s*=\s*(?:'([^']*)'|\"([^\"]*)\"|(\S+))", args_str):
                 key = arg_match.group(1)
                 value = arg_match.group(2) or arg_match.group(3) or arg_match.group(4)
-                if value.lower() == 'true':
+                if value.lower() == "true":
                     value = True
-                elif value.lower() == 'false':
+                elif value.lower() == "false":
                     value = False
                 elif value.isdigit():
                     value = int(value)
-                elif re.match(r'^[\d.]+$', value):
+                elif re.match(r"^[\d.]+$", value):
                     try:
                         value = float(value)
                     except ValueError:
@@ -450,9 +431,9 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
                 print(f"   {key}: {value}")
         else:
             print(f"Failed: {result.get('error', 'Unknown error')}")
-            if result.get('expected_params'):
+            if result.get("expected_params"):
                 print(f"   Expected: {result['expected_params']}")
-            if result.get('example'):
+            if result.get("example"):
                 print(f"   Example: {result['example']}")
 
         print("-" * 40 + "\n")
@@ -463,9 +444,9 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         metrics = self._gather_metrics()
         calib = self.calibration.difficulty_moving_avg
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("INTERNAL STATE (PAD Model)")
-        print("="*60)
+        print("=" * 60)
         print(f"Valence:      {state['valence']:+.2f}  (pleasure/displeasure)")
         print(f"Arousal:      {state['arousal']:+.2f}  (calm/excited)")
         print(f"Dominance:    {state['dominance']:+.2f}  (submissive/dominant)")
@@ -476,7 +457,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         print(f"Assurance:    {metrics['assurance_success']:.2f}")
         print(f"Turn Count:   {self.turn_count}")
         print(f"Narrative:    {self.temporal.narrative_summary[:60]}...")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
     # =========================================================================
     # Background Tasks
@@ -493,7 +474,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             await asyncio.sleep(300)  # Every 5 minutes
 
             # 1. Save Mandelbrot word frequency corpus
-            if hasattr(self.assurance, 'save_mandelbrot_corpus'):
+            if hasattr(self.assurance, "save_mandelbrot_corpus"):
                 self.assurance.save_mandelbrot_corpus()
 
             # 2. Apply emotional decay toward baseline
@@ -501,7 +482,9 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
 
             # 3. Check for goal drift
             if self.temporal.detect_goal_drift():
-                self.temporal.add_milestone("Goal drift detected — narrative may need recalibration")
+                self.temporal.add_milestone(
+                    "Goal drift detected — narrative may need recalibration"
+                )
 
     async def shutdown(self):
         """Graceful shutdown - cancel background tasks and save state."""
@@ -518,7 +501,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         self._background_tasks.clear()
 
         # Save Mandelbrot corpus on exit
-        if hasattr(self.assurance, 'save_mandelbrot_corpus'):
+        if hasattr(self.assurance, "save_mandelbrot_corpus"):
             self.assurance.save_mandelbrot_corpus()
 
         await self.memory.save_state()

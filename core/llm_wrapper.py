@@ -14,6 +14,7 @@ class LLMProvider(Enum):
     ANTHROPIC = "anthropic"
     OLLAMA = "ollama"
 
+
 class LLMWrapper:
     """Unified LLM interface supporting multiple providers."""
 
@@ -42,46 +43,37 @@ class LLMWrapper:
         """Initialize the appropriate client."""
         if self.provider == LLMProvider.ANTHROPIC:
             import anthropic
-            self.client = anthropic.Anthropic(
-                api_key=os.getenv("ANTHROPIC_API_KEY")
-            )
+
+            self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
             self.model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
 
         elif self.provider == LLMProvider.OPENAI:
             import openai
-            self.client = openai.OpenAI(
-                api_key=os.getenv("OPENAI_API_KEY")
-            )
+
+            self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             self.model = os.getenv("OPENAI_MODEL", "gpt-4")
 
         elif self.provider == LLMProvider.OLLAMA:
             import httpx
+
             self.client = httpx.AsyncClient()
             self.model = os.getenv("OLLAMA_MODEL", "llama3.2")
-            self.ollama_base_url = os.getenv(
-                "OLLAMA_BASE_URL", "http://localhost:11434"
-            )
+            self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
     async def generate(
         self,
         prompt: str,
         temperature: float = 0.7,
         max_tokens: int = 1000,
-        system: Optional[str] = None
+        system: Optional[str] = None,
     ) -> str:
         """Generate completion from prompt."""
         if self.provider == LLMProvider.ANTHROPIC:
-            return await self._generate_anthropic(
-                prompt, temperature, max_tokens, system
-            )
+            return await self._generate_anthropic(prompt, temperature, max_tokens, system)
         elif self.provider == LLMProvider.OPENAI:
-            return await self._generate_openai(
-                prompt, temperature, max_tokens, system
-            )
+            return await self._generate_openai(prompt, temperature, max_tokens, system)
         elif self.provider == LLMProvider.OLLAMA:
-            return await self._generate_ollama(
-                prompt, temperature, max_tokens, system
-            )
+            return await self._generate_ollama(prompt, temperature, max_tokens, system)
 
     async def _generate_anthropic(
         self, prompt: str, temperature: float, max_tokens: int, system: Optional[str]
@@ -93,7 +85,7 @@ class LLMWrapper:
             "model": self.model,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "messages": messages
+            "messages": messages,
         }
 
         if system:
@@ -120,7 +112,7 @@ class LLMWrapper:
             model=self.model,
             messages=messages,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         )
 
         return response.choices[0].message.content
@@ -133,16 +125,13 @@ class LLMWrapper:
             "model": self.model,
             "prompt": prompt,
             "temperature": temperature,
-            "options": {"num_predict": max_tokens}
+            "options": {"num_predict": max_tokens},
         }
 
         if system:
             payload["system"] = system
 
-        response = await self.client.post(
-            f"{self.ollama_base_url}/api/generate",
-            json=payload
-        )
+        response = await self.client.post(f"{self.ollama_base_url}/api/generate", json=payload)
 
         data = response.json()
         return data.get("response", "")
@@ -151,10 +140,7 @@ class LLMWrapper:
         """Generate embedding for text (used by memory system)."""
         # Simple implementation - in production, use proper embedding model
         if self.provider == LLMProvider.OPENAI:
-            response = self.client.embeddings.create(
-                model="text-embedding-3-small",
-                input=text
-            )
+            response = self.client.embeddings.create(model="text-embedding-3-small", input=text)
             return response.data[0].embedding
         else:
             # Fallback: use sentence-transformers or similar
@@ -162,6 +148,7 @@ class LLMWrapper:
             import hashlib
 
             import numpy as np
+
             hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
             rng = np.random.default_rng(hash_val % (2**32))
             return rng.standard_normal(384).tolist()

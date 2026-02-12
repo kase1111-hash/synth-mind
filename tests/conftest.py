@@ -15,19 +15,19 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Pytest Configuration
 # =============================================================================
 
+
 def pytest_configure(config):
     """Configure pytest markers."""
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
 
 
 # =============================================================================
 # Shared Mock Classes
 # =============================================================================
+
 
 class MockLLM:
     """Mock LLM for testing without API calls."""
@@ -37,34 +37,34 @@ class MockLLM:
         prompt_lower = prompt.lower()
 
         if "simulate" in prompt_lower and "user messages" in prompt_lower:
-            return '''[
+            return """[
                 {"text": "Thanks!", "probability": 0.5},
                 {"text": "Can you explain?", "probability": 0.3},
                 {"text": "What else?", "probability": 0.2}
-            ]'''
+            ]"""
         elif "reflection" in prompt_lower or "evaluate yourself" in prompt_lower:
-            return '''{
+            return """{
                 "coherence_score": 0.85,
                 "alignment_score": 0.9,
                 "issues_detected": [],
                 "recommended_adjustments": {},
                 "self_statement": "Operating well",
                 "overall_insight": "Good progress"
-            }'''
+            }"""
         elif "self-narrative" in prompt_lower or "narrative" in prompt_lower:
             return (
                 "I am an AI that has been reflecting on my interactions. "
                 "I have learned to be more attentive and empathetic."
             )
         elif "reformat" in prompt_lower or "valid json" in prompt_lower:
-            return '''{
+            return """{
                 "coherence_score": 0.75,
                 "alignment_score": 0.8,
                 "issues_detected": [],
                 "recommended_adjustments": {},
                 "self_statement": "Reformatted",
                 "overall_insight": "Recovered from parse failure"
-            }'''
+            }"""
         return "Mock response"
 
     def get_embedding(self, text):
@@ -92,23 +92,17 @@ class MockMemory:
 
     def embed(self, text):
         import numpy as np
+
         hash_val = hash(text) % 1000000
         rng = np.random.default_rng(hash_val)
         return rng.standard_normal(384)
 
     def store_turn(self, user_input, response):
         self.current_turn += 1
-        self.conversation_history.append({
-            "user": user_input,
-            "assistant": response
-        })
+        self.conversation_history.append({"user": user_input, "assistant": response})
 
     def store_episodic(self, event, content, valence=0.0):
-        self.episodic_buffer.append({
-            "event": event,
-            "content": content,
-            "valence": valence
-        })
+        self.episodic_buffer.append({"event": event, "content": content, "valence": valence})
 
     def store_persistent(self, key, value):
         self.persistent_store[key] = value
@@ -142,18 +136,25 @@ class MockEmotionRegulator:
         self.signals = []
         self.tone_adjustments = []
 
-    def apply_reward_signal(self, valence, label, intensity,
-                            arousal_delta=0.0, dominance_delta=0.0):
-        self.signals.append({
-            "valence": valence,
-            "label": label,
-            "intensity": intensity,
-            "arousal_delta": arousal_delta,
-            "dominance_delta": dominance_delta,
-        })
+    def apply_reward_signal(
+        self, valence, label, intensity, arousal_delta=0.0, dominance_delta=0.0
+    ):
+        self.signals.append(
+            {
+                "valence": valence,
+                "label": label,
+                "intensity": intensity,
+                "arousal_delta": arousal_delta,
+                "dominance_delta": dominance_delta,
+            }
+        )
         self.current_valence = max(-1, min(1, self.current_valence + valence * intensity * 0.1))
-        self.current_arousal = max(-1, min(1, self.current_arousal + arousal_delta * intensity * 0.1))
-        self.current_dominance = max(-1, min(1, self.current_dominance + dominance_delta * intensity * 0.1))
+        self.current_arousal = max(
+            -1, min(1, self.current_arousal + arousal_delta * intensity * 0.1)
+        )
+        self.current_dominance = max(
+            -1, min(1, self.current_dominance + dominance_delta * intensity * 0.1)
+        )
 
     def adjust_tone(self, *args):
         self.tone_adjustments.append(args)
@@ -163,7 +164,7 @@ class MockEmotionRegulator:
             "valence": self.current_valence,
             "arousal": self.current_arousal,
             "dominance": self.current_dominance,
-            "tags": ["neutral"]
+            "tags": ["neutral"],
         }
 
     def get_current_state(self):
@@ -196,6 +197,7 @@ class MockTemporalPurpose:
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_llm():

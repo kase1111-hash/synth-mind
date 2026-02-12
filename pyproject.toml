@@ -57,9 +57,7 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
-monitoring = [
-    "alembic>=1.13.0",
-]
+monitoring = []
 
 [project.urls]
 Homepage = "https://github.com/synth-mind/synth-mind"
@@ -70,11 +68,11 @@ Changelog = "https://github.com/synth-mind/synth-mind/blob/main/CHANGELOG.md"
 
 [project.scripts]
 synth-mind = "run_synth:main"
-synth-dashboard = "dashboard.run_synth_with_dashboard:main"
+synth-dashboard = "dashboard.server:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["core*", "psychological*", "utils*", "security*", "dashboard*", "tools*"]
+include = ["core*", "psychological*", "utils*", "dashboard*", "eval*"]
 
 [tool.black]
 line-length = 100
@@ -134,7 +132,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["core", "psychological", "utils", "security", "dashboard", "tools"]
+source = ["core", "psychological", "utils", "dashboard", "eval"]
 omit = ["**/tests/*", "**/__pycache__/*"]
 
 [tool.coverage.report]

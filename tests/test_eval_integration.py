@@ -11,10 +11,10 @@ from eval.judge import LLMJudge
 from eval.run_eval import EvalMockLLM, EvalMockMemory
 from eval.synth_agent import SynthAgent
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_llm():
@@ -44,6 +44,7 @@ def synth(mock_llm, mock_memory, personality):
 # =============================================================================
 # Test: Emotion affects system prompt
 # =============================================================================
+
 
 class TestEmotionAffectsOutput:
     """Verify that emotional state changes produce different system prompts."""
@@ -113,6 +114,7 @@ class TestEmotionAffectsOutput:
 # Test: Dreaming affects system prompt
 # =============================================================================
 
+
 class TestDreamingAffectsOutput:
     """Verify dream predictions appear in system prompt."""
 
@@ -121,6 +123,7 @@ class TestDreamingAffectsOutput:
         """When dreams exist, they should appear in the system prompt."""
         # Manually populate dream buffer
         import numpy as np
+
         synth.dreaming.dream_buffer = [
             {
                 "text": "Thanks for the help!",
@@ -144,7 +147,6 @@ class TestDreamingAffectsOutput:
     @pytest.mark.asyncio
     async def test_dream_resolution_changes_emotion(self, synth, mock_memory):
         """Resolving dreams should affect emotional state."""
-        import numpy as np
 
         # Add a dream
         synth.dreaming.dream_buffer = [
@@ -168,6 +170,7 @@ class TestDreamingAffectsOutput:
 # Test: Reflection affects system prompt
 # =============================================================================
 
+
 class TestReflectionAffectsOutput:
     """Verify reflection corrections reach the system prompt."""
 
@@ -175,18 +178,20 @@ class TestReflectionAffectsOutput:
     async def test_corrective_instruction_in_prompt(self, synth):
         """Low coherence reflection should inject correction into prompt."""
         # Simulate a low-coherence reflection result
-        synth.reflection.reflection_log.append({
-            "turn": 10,
-            "trigger": "periodic",
-            "reflection": {
-                "coherence_score": 0.4,
-                "alignment_score": 0.6,
-                "issues_detected": ["topic drift"],
-                "recommended_adjustments": {"strategy": "refocus on user needs"},
-                "self_statement": "I need to recalibrate",
-                "overall_insight": "Drifting from purpose",
-            },
-        })
+        synth.reflection.reflection_log.append(
+            {
+                "turn": 10,
+                "trigger": "periodic",
+                "reflection": {
+                    "coherence_score": 0.4,
+                    "alignment_score": 0.6,
+                    "issues_detected": ["topic drift"],
+                    "recommended_adjustments": {"strategy": "refocus on user needs"},
+                    "self_statement": "I need to recalibrate",
+                    "overall_insight": "Drifting from purpose",
+                },
+            }
+        )
 
         prompt = synth._build_system_prompt()
         assert "self-correction" in prompt.lower() or "coherence" in prompt.lower()
@@ -194,15 +199,17 @@ class TestReflectionAffectsOutput:
     @pytest.mark.asyncio
     async def test_no_correction_when_coherent(self, synth):
         """High coherence should not inject corrections."""
-        synth.reflection.reflection_log.append({
-            "turn": 10,
-            "reflection": {
-                "coherence_score": 0.9,
-                "issues_detected": [],
-                "recommended_adjustments": {},
-                "overall_insight": "All good",
-            },
-        })
+        synth.reflection.reflection_log.append(
+            {
+                "turn": 10,
+                "reflection": {
+                    "coherence_score": 0.9,
+                    "issues_detected": [],
+                    "recommended_adjustments": {},
+                    "overall_insight": "All good",
+                },
+            }
+        )
 
         prompt = synth._build_system_prompt()
         assert "self-correction" not in prompt.lower()
@@ -211,6 +218,7 @@ class TestReflectionAffectsOutput:
 # =============================================================================
 # Test: Assurance affects system prompt
 # =============================================================================
+
 
 class TestAssuranceAffectsOutput:
     """Verify uncertainty level modifies the system prompt."""
@@ -248,6 +256,7 @@ class TestAssuranceAffectsOutput:
 # Test: Narrative appears in system prompt
 # =============================================================================
 
+
 class TestNarrativeAffectsOutput:
     """Verify temporal purpose narrative reaches the system prompt."""
 
@@ -272,6 +281,7 @@ class TestNarrativeAffectsOutput:
 # =============================================================================
 # Test: Full pipeline differs from baseline
 # =============================================================================
+
 
 class TestFullPipeline:
     """End-to-end tests: synth pipeline produces measurably different output."""
@@ -319,6 +329,7 @@ class TestFullPipeline:
 # Test: Judge produces valid output
 # =============================================================================
 
+
 class TestJudge:
     """Verify the judge module works correctly."""
 
@@ -336,8 +347,13 @@ class TestJudge:
         assert "response_a" in result
         assert "response_b" in result
         assert "winner" in result
-        for dim in ["coherence", "empathy", "helpfulness",
-                     "personality_consistency", "naturalness"]:
+        for dim in [
+            "coherence",
+            "empathy",
+            "helpfulness",
+            "personality_consistency",
+            "naturalness",
+        ]:
             assert dim in result["response_a"]
             assert dim in result["response_b"]
 
@@ -376,6 +392,7 @@ class TestJudge:
 # Test: Eval runner works end-to-end
 # =============================================================================
 
+
 class TestEvalRunner:
     """Verify the eval runner executes without errors."""
 
@@ -384,15 +401,20 @@ class TestEvalRunner:
         """Run a single scenario through the full eval pipeline."""
         from eval.run_eval import run_evaluation
 
-        scenarios = [{
-            "name": "test_scenario",
-            "category": "test",
-            "description": "A simple test",
-            "turns": ["Hello!", "How are you?", "Thanks!"],
-        }]
+        scenarios = [
+            {
+                "name": "test_scenario",
+                "category": "test",
+                "description": "A simple test",
+                "turns": ["Hello!", "How are you?", "Thanks!"],
+            }
+        ]
 
         results = await run_evaluation(
-            scenarios, llm=mock_llm, memory=mock_memory, verbose=False,
+            scenarios,
+            llm=mock_llm,
+            memory=mock_memory,
+            verbose=False,
         )
 
         assert results["total_judgments"] == 3
@@ -404,18 +426,23 @@ class TestEvalRunner:
         """In at least some turns, synth should produce different responses."""
         from eval.run_eval import run_evaluation
 
-        scenarios = [{
-            "name": "emotion_test",
-            "category": "emotional_support",
-            "turns": [
-                "I'm having a terrible day.",
-                "Nothing is going right.",
-                "Can you help me feel better?",
-            ],
-        }]
+        scenarios = [
+            {
+                "name": "emotion_test",
+                "category": "emotional_support",
+                "turns": [
+                    "I'm having a terrible day.",
+                    "Nothing is going right.",
+                    "Can you help me feel better?",
+                ],
+            }
+        ]
 
         results = await run_evaluation(
-            scenarios, llm=mock_llm, memory=mock_memory, verbose=False,
+            scenarios,
+            llm=mock_llm,
+            memory=mock_memory,
+            verbose=False,
         )
 
         # With our mock LLM, synth should win at least some turns
