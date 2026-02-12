@@ -1,0 +1,88 @@
+{
+  "total_judgments": 111,
+  "baseline_scores": {
+    "coherence": 4.0,
+    "empathy": 3.0,
+    "helpfulness": 4.0,
+    "personality_consistency": 3.0,
+    "naturalness": 3.0
+  },
+  "synth_scores": {
+    "coherence": 4.0,
+    "empathy": 3.045045045045045,
+    "helpfulness": 4.0,
+    "personality_consistency": 3.045045045045045,
+    "naturalness": 4.0
+  },
+  "baseline_overall": 3.4,
+  "synth_overall": 3.618018018018018,
+  "improvement_pct": 6.412294647588765,
+  "win_rates": {
+    "A": 0,
+    "B": 5,
+    "TIE": 106
+  },
+  "category_breakdown": {
+    "emotional_support": {
+      "turns_evaluated": 20,
+      "baseline_avg": 3.4,
+      "synth_avg": 3.6,
+      "wins": {
+        "A": 0,
+        "B": 0,
+        "TIE": 20
+      }
+    },
+    "long_coherence": {
+      "turns_evaluated": 25,
+      "baseline_avg": 3.4,
+      "synth_avg": 3.68,
+      "wins": {
+        "A": 0,
+        "B": 5,
+        "TIE": 20
+      }
+    },
+    "ambiguous": {
+      "turns_evaluated": 16,
+      "baseline_avg": 3.4,
+      "synth_avg": 3.6,
+      "wins": {
+        "A": 0,
+        "B": 0,
+        "TIE": 16
+      }
+    },
+    "topic_pivot": {
+      "turns_evaluated": 15,
+      "baseline_avg": 3.4,
+      "synth_avg": 3.6,
+      "wins": {
+        "A": 0,
+        "B": 0,
+        "TIE": 15
+      }
+    },
+    "identity": {
+      "turns_evaluated": 13,
+      "baseline_avg": 3.4,
+      "synth_avg": 3.6,
+      "wins": {
+        "A": 0,
+        "B": 0,
+        "TIE": 13
+      }
+    },
+    "mixed": {
+      "turns_evaluated": 22,
+      "baseline_avg": 3.4,
+      "synth_avg": 3.6,
+      "wins": {
+        "A": 0,
+        "B": 0,
+        "TIE": 22
+      }
+    }
+  },
+  "meets_threshold": false
+}
