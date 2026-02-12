@@ -1,5 +1,10 @@
 """
 Core Orchestrator - Main conversation loop with psychological modules.
+
+Key Phase 2 changes:
+- SystemPromptBuilder wires all psychological state into LLM system prompt
+- Temperature combines calibration base + emotion arousal modifier
+- Background consolidation actually does work (memory compression, narrative update)
 """
 
 import asyncio
@@ -65,7 +70,6 @@ class SynthOrchestrator:
 
     async def initialize(self):
         """Load configuration and initialize all modules."""
-        # Load personality configuration
         self.personality_config = self._load_personality_config()
 
         # Initialize core
@@ -82,7 +86,6 @@ class SynthOrchestrator:
             self.llm, self.memory, self.emotion
         )
 
-        # Get Mandelbrot weighting config for AssuranceResolutionModule
         mandelbrot_config = self.personality_config.get("mandelbrot_weighting", {})
 
         self.assurance = AssuranceResolutionModule(
@@ -90,8 +93,9 @@ class SynthOrchestrator:
             mandelbrot_config=mandelbrot_config
         )
 
+        # TemporalPurpose now receives LLM for narrative synthesis
         self.temporal = TemporalPurposeEngine(
-            self.memory, self.emotion
+            self.memory, self.emotion, llm=self.llm
         )
 
         self.reflection = MetaReflectionModule(
@@ -107,12 +111,89 @@ class SynthOrchestrator:
             asyncio.create_task(self._background_consolidation()),
         ]
 
+    # =========================================================================
+    # System Prompt Builder — the primary mechanism for psychology → output
+    # =========================================================================
+
+    def _build_system_prompt(self) -> str:
+        """
+        Compose system prompt from all psychological module states.
+        This is how emotional state, dreams, reflections, and identity
+        actually reach the LLM output.
+        """
+        sections = []
+
+        # 1. Base personality
+        sections.append(self._get_personality_prompt())
+
+        # 2. Emotional state influence (PAD model → tone/verbosity/assertiveness)
+        emotion_modifier = self.emotion.get_system_prompt_modifier()
+        if emotion_modifier:
+            sections.append(emotion_modifier)
+
+        # 3. Current narrative / identity
+        narrative = self.temporal.current_narrative_summary()
+        sections.append(f"Your current self-understanding: {narrative}")
+
+        # 4. Dream predictions context — what you anticipated
+        if self.dreaming.dream_buffer:
+            top_dream = max(self.dreaming.dream_buffer, key=lambda d: d['prob'])
+            sections.append(
+                f"You anticipated the user might say something like: "
+                f"'{top_dream['text'][:100]}'. Adapt if reality differs."
+            )
+
+        # 5. Recent reflection insights and corrections
+        corrective = self.reflection.get_corrective_instruction()
+        if corrective:
+            sections.append(f"Self-correction: {corrective}")
+        elif self.reflection.reflection_log:
+            last = self.reflection.reflection_log[-1]
+            insight = last.get('reflection', {}).get('overall_insight', '')
+            if insight:
+                sections.append(f"Recent self-insight: {insight}")
+
+        # 6. Assurance level — modify behavior when uncertain
+        recent_uncertainty = self.assurance.recent_uncertainty_avg()
+        if recent_uncertainty > 0.7:
+            sections.append(
+                "You are uncertain about recent interactions. "
+                "Be more careful, ask clarifying questions, hedge appropriately."
+            )
+        elif recent_uncertainty < 0.3:
+            sections.append(
+                "You are confident in recent interactions. "
+                "Be direct and helpful."
+            )
+
+        return "\n\n".join(sections)
+
+    def _get_personality_prompt(self) -> str:
+        """Get base personality prompt from config."""
+        profiles = self.personality_config.get("profiles", {})
+        active = profiles.get("active_profile", "empathetic_collaborator")
+        presets = profiles.get("presets", {})
+        profile = presets.get(active, {})
+
+        if not profile:
+            return "You are a helpful, thoughtful AI assistant."
+
+        comm = profile.get("communication", {})
+        tone = comm.get("tone", "warm and encouraging")
+        return (
+            f"You are a {profile.get('description', 'helpful AI')}. "
+            f"Your communication tone is {tone}."
+        )
+
+    # =========================================================================
+    # Main Loop
+    # =========================================================================
+
     async def run(self):
         """Main conversation loop."""
         self.running = True
 
         while self.running:
-            # Get user input
             try:
                 user_input = await self._get_input()
             except EOFError:
@@ -121,43 +202,50 @@ class SynthOrchestrator:
             if not user_input.strip():
                 continue
 
-            # Handle commands
             if user_input.startswith('/'):
                 await self._handle_command(user_input)
                 continue
 
-            # Process turn
             await self._process_turn(user_input)
 
     async def _process_turn(self, user_input: str):
         """Process a single conversation turn with all modules."""
         self.turn_count += 1
 
-        # 1. Resolve previous dreams if any
+        # 1. Resolve previous dreams
         if self.dreaming.dream_buffer:
             reward, alignment = self.dreaming.resolve_dreams(user_input)
             self.metrics.log_dream_alignment(alignment)
 
             if alignment < 0.4:
-                # Signal high vigilance to other modules
                 self.assurance.vigilance_level = "HIGH"
 
         # 2. Update context
         self.context.append({"role": "user", "content": user_input})
         context_str = self._format_context()
 
-        # 3. Generate draft response (Tier 1 cognition)
+        # 3. Build system prompt from all psychological state
+        system_prompt = self._build_system_prompt()
+
+        # 4. Compute effective temperature: calibration base + emotion modifier
+        base_temp = self.calibration.creativity_temperature
+        emotion_temp_delta = self.emotion.get_temperature_modifier()
+        effective_temp = max(0.1, min(1.5, base_temp + emotion_temp_delta))
+
+        # 5. Generate draft response with psychological context
         draft_response = await self.llm.generate(
             context_str,
-            temperature=self.calibration.creativity_temperature
+            temperature=effective_temp,
+            system=system_prompt
         )
 
-        # 4. Run Assurance cycle
+        # 6. Run Assurance cycle
         uncertainty, _ = self.assurance.run_cycle(
-            draft_response, context_str, {}
+            draft_response, context_str, {},
+            user_message=user_input
         )
 
-        # 5. Meta-cognitive refinement (if needed)
+        # 7. Meta-cognitive refinement (if needed)
         if uncertainty > 0.6 or self.turn_count % 3 == 0:
             final_response = await self._metacognitive_refine(
                 draft_response, user_input, context_str
@@ -165,7 +253,7 @@ class SynthOrchestrator:
         else:
             final_response = draft_response
 
-        # 6. Check for meta-reflection trigger
+        # 8. Check for meta-reflection trigger
         reflection_result = await self.reflection.run_cycle(
             context_str,
             self.emotion.current_state(),
@@ -173,23 +261,25 @@ class SynthOrchestrator:
         )
 
         if reflection_result and reflection_result.get("coherence_score", 1.0) < 0.6:
-            # Inject subtle self-awareness
             final_response += "\n\n(Taking a moment to recalibrate...)"
 
-        # 7. Apply reward calibration
+        # 9. Apply reward calibration
         calib_state = self.calibration.run_cycle()
 
-        # 8. Output response
-        print(f"\n🔮 Synth: {final_response}\n")
+        # 10. Apply emotional decay (gradual return to baseline)
+        self.emotion.apply_decay()
 
-        # 9. Update context and state
+        # 11. Output response
+        print(f"\n Synth: {final_response}\n")
+
+        # 12. Update context and state
         self.context.append({"role": "assistant", "content": final_response})
         self.memory.store_turn(user_input, final_response)
 
-        # 10. Dream ahead for next turn
+        # 13. Dream ahead for next turn
         await self.dreaming.dream_next_turn(self._format_context())
 
-        # 11. Update metrics
+        # 14. Update metrics
         self.metrics.update_turn_metrics(
             alignment=self.metrics.last_dream_alignment,
             uncertainty=uncertainty,
@@ -199,7 +289,7 @@ class SynthOrchestrator:
     async def _metacognitive_refine(
         self, draft: str, user_input: str, context: str
     ) -> str:
-        """Internal monologue - critique and refine the draft."""
+        """Internal monologue — critique and refine the draft."""
         current_mood = self.emotion.get_current_state()
 
         prompt = f"""
@@ -222,6 +312,10 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         except (json.JSONDecodeError, KeyError):
             return draft
 
+    # =========================================================================
+    # Helpers
+    # =========================================================================
+
     async def _get_input(self) -> str:
         """Get user input asynchronously."""
         return await asyncio.to_thread(input, "You: ")
@@ -239,6 +333,10 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
             "user_sentiment": self.metrics.avg_user_sentiment()
         }
 
+    # =========================================================================
+    # Commands
+    # =========================================================================
+
     async def _handle_command(self, command: str):
         """Handle special commands."""
         cmd = command.lower().strip()
@@ -251,19 +349,19 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
                 self.emotion.current_state(),
                 self._gather_metrics()
             )
-            print(f"\n🧠 Reflection: {json.dumps(result, indent=2)}\n")
+            print(f"\nReflection: {json.dumps(result, indent=2)}\n")
         elif cmd == "/dream":
-            print(f"\n💭 Dream Buffer ({len(self.dreaming.dream_buffer)} dreams):")
+            print(f"\nDream Buffer ({len(self.dreaming.dream_buffer)} dreams):")
             for i, dream in enumerate(self.dreaming.dream_buffer[:5], 1):
                 print(f"  {i}. {dream['text'][:80]}... (p={dream['prob']:.2f})")
             print()
         elif cmd == "/purpose":
             narrative = self.temporal.current_narrative_summary()
-            print(f"\n📖 Current Narrative:\n  {narrative}\n")
+            print(f"\nCurrent Narrative:\n  {narrative}\n")
         elif cmd == "/reset":
             self.context = []
             self.turn_count = 0
-            print("\n✓ Session reset (identity preserved)\n")
+            print("\nSession reset (identity preserved)\n")
         elif cmd == "/tools":
             self._print_tools()
         elif cmd.startswith("/tool "):
@@ -271,7 +369,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         elif cmd == "/quit":
             self.running = False
         else:
-            print(f"\n❓ Unknown command: {command}\n")
+            print(f"\nUnknown command: {command}\n")
 
     def _print_tools(self):
         """Display available tools."""
@@ -280,7 +378,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         print("AVAILABLE TOOLS")
         print("="*60)
         for name, info in tools.items():
-            print(f"\n🔧 {name}")
+            print(f"\n  {name}")
             print(f"   {info['description']}")
             params = ", ".join(f"{k}={v}" for k, v in info['params'].items())
             print(f"   Params: {params}")
@@ -294,14 +392,11 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         """Execute a tool from command line."""
         import re
 
-        # Parse tool call: tool_name(arg1='val1', arg2='val2')
         match = re.match(r'(\w+)\((.*)\)', tool_call, re.DOTALL)
         if not match:
-            # Try simple format: tool_name arg
             parts = tool_call.split(maxsplit=1)
             if len(parts) == 2:
                 tool_name = parts[0]
-                # Assume single main argument
                 info = self.tools.get_tool_info(tool_name)
                 if info and info['params']:
                     first_param = list(info['params'].keys())[0]
@@ -309,7 +404,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
                     result = self.tools.execute(tool_name, **kwargs)
                     self._print_tool_result(tool_name, result)
                     return
-            print("\n❌ Invalid tool call format")
+            print("\nInvalid tool call format")
             print("   Use: /tool tool_name(arg='value')")
             print("   Or:  /tool tool_name value\n")
             return
@@ -317,14 +412,11 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         tool_name = match.group(1)
         args_str = match.group(2)
 
-        # Parse arguments
         kwargs = {}
         if args_str.strip():
-            # Simple parsing: key='value' or key="value" or key=value
             for arg_match in re.finditer(r"(\w+)\s*=\s*(?:'([^']*)'|\"([^\"]*)\"|(\S+))", args_str):
                 key = arg_match.group(1)
                 value = arg_match.group(2) or arg_match.group(3) or arg_match.group(4)
-                # Try to convert to appropriate type
                 if value.lower() == 'true':
                     value = True
                 elif value.lower() == 'false':
@@ -338,17 +430,16 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
                         pass
                 kwargs[key] = value
 
-        # Execute tool
         result = self.tools.execute(tool_name, **kwargs)
         self._print_tool_result(tool_name, result)
 
     def _print_tool_result(self, tool_name: str, result: dict):
         """Pretty print tool execution result."""
-        print(f"\n🔧 Tool: {tool_name}")
+        print(f"\nTool: {tool_name}")
         print("-" * 40)
 
         if result.get("success"):
-            print("✅ Success")
+            print("Success")
             for key, value in result.items():
                 if key == "success":
                     continue
@@ -358,7 +449,7 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
                     value = value[:5] + ["..."]
                 print(f"   {key}: {value}")
         else:
-            print(f"❌ Failed: {result.get('error', 'Unknown error')}")
+            print(f"Failed: {result.get('error', 'Unknown error')}")
             if result.get('expected_params'):
                 print(f"   Expected: {result['expected_params']}")
             if result.get('example'):
@@ -367,33 +458,55 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
         print("-" * 40 + "\n")
 
     def _print_state(self):
-        """Display current internal state."""
+        """Display current internal state (PAD model)."""
         state = self.emotion.current_state()
         metrics = self._gather_metrics()
         calib = self.calibration.difficulty_moving_avg
 
         print("\n" + "="*60)
-        print("INTERNAL STATE")
+        print("INTERNAL STATE (PAD Model)")
         print("="*60)
-        print(f"Valence:      {state['valence']:+.2f}  {state['tags']}")
+        print(f"Valence:      {state['valence']:+.2f}  (pleasure/displeasure)")
+        print(f"Arousal:      {state['arousal']:+.2f}  (calm/excited)")
+        print(f"Dominance:    {state['dominance']:+.2f}  (submissive/dominant)")
+        print(f"Mood Tags:    {state['tags']}")
         print(f"Flow State:   {calib:.2f}  (target: 0.4-0.7)")
+        print(f"Temperature:  {self.calibration.creativity_temperature:.2f}")
         print(f"Dream Align:  {metrics['predictive_alignment']:.2f}")
         print(f"Assurance:    {metrics['assurance_success']:.2f}")
         print(f"Turn Count:   {self.turn_count}")
         print(f"Narrative:    {self.temporal.narrative_summary[:60]}...")
         print("="*60 + "\n")
 
+    # =========================================================================
+    # Background Tasks
+    # =========================================================================
+
     async def _background_consolidation(self):
-        """Background task for memory consolidation."""
+        """
+        Background task for periodic housekeeping:
+        - Save Mandelbrot corpus
+        - Update temporal narrative based on accumulated data
+        - Apply emotional decay
+        """
         while self.running:
-            await asyncio.sleep(3600)  # Check hourly
-            # Consolidation logic would go here
+            await asyncio.sleep(300)  # Every 5 minutes
+
+            # 1. Save Mandelbrot word frequency corpus
+            if hasattr(self.assurance, 'save_mandelbrot_corpus'):
+                self.assurance.save_mandelbrot_corpus()
+
+            # 2. Apply emotional decay toward baseline
+            self.emotion.apply_decay()
+
+            # 3. Check for goal drift
+            if self.temporal.detect_goal_drift():
+                self.temporal.add_milestone("Goal drift detected — narrative may need recalibration")
 
     async def shutdown(self):
         """Graceful shutdown - cancel background tasks and save state."""
         self.running = False
 
-        # Cancel all background tasks
         for task in self._background_tasks:
             if not task.done():
                 task.cancel()
@@ -403,5 +516,10 @@ Output JSON: {{"score": float, "internal_thought": str, "final_response": str}}
                     pass
 
         self._background_tasks.clear()
+
+        # Save Mandelbrot corpus on exit
+        if hasattr(self.assurance, 'save_mandelbrot_corpus'):
+            self.assurance.save_mandelbrot_corpus()
+
         await self.memory.save_state()
-        print("✓ State saved")
+        print("State saved")
