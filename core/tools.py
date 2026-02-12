@@ -1,16 +1,9 @@
 """
-Tool Manager - Advanced tool execution with sandboxing and safety controls.
+Tool Manager - Tool execution with sandboxing and safety controls.
 
 Available Tools:
-- calculator: Evaluate mathematical expressions
-- timer: Wait for specified seconds
-- web_search: Search the web using DuckDuckGo
-- http_fetch: Fetch content from URLs
-- code_execute: Run Python code in a sandbox
-- file_read: Read files from workspace
-- file_write: Write files to workspace
-- file_list: List files in workspace
-- shell_run: Execute shell commands (restricted)
+- calculator: Evaluate mathematical expressions (AST-based, no eval)
+- code_execute: Run Python code in a sandboxed subprocess
 - json_parse: Parse and query JSON data
 """
 
@@ -18,37 +11,20 @@ import asyncio
 import json
 import multiprocessing
 import re
-import shlex
-import subprocess
 import time
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import quote_plus
 
 
 class ToolManager:
     """
     Manages safe execution of tools and external capabilities.
-    Includes sandboxing for code execution and file operations.
+    Includes sandboxing for code execution.
     """
 
     # Safety limits
     MAX_CODE_EXECUTION_TIME = 10  # seconds
     MAX_OUTPUT_LENGTH = 10000  # characters
-    MAX_FILE_SIZE = 1_000_000  # 1MB
-    # Safe commands only - removed 'find' (has -exec) and 'grep' (complex args)
-    ALLOWED_SHELL_COMMANDS = {
-        "ls", "pwd", "date", "whoami", "echo", "head", "tail",
-        "wc", "sort", "uniq", "diff", "which"
-    }
-
-    # Dangerous argument patterns per command
-    BLOCKED_ARGS = {
-        "ls": {"-R"},  # Recursive could be slow
-        "head": set(),
-        "tail": set(),
-        "diff": set(),
-    }
 
     def __init__(self, workspace_dir: str = "workspace"):
         self.workspace = Path(workspace_dir)
@@ -61,14 +37,7 @@ class ToolManager:
         """Register all available tools with descriptions."""
         self.available_tools = {
             "calculator": self._calculator,
-            "timer": self._timer,
-            "web_search": self._web_search,
-            "http_fetch": self._http_fetch,
             "code_execute": self._code_execute,
-            "file_read": self._file_read,
-            "file_write": self._file_write,
-            "file_list": self._file_list,
-            "shell_run": self._shell_run,
             "json_parse": self._json_parse,
         }
 
@@ -78,54 +47,10 @@ class ToolManager:
                 "params": {"expression": "Mathematical expression to evaluate"},
                 "example": "calculator(expression='2 + 2 * 3')"
             },
-            "timer": {
-                "description": "Wait for specified seconds (max 30)",
-                "params": {"seconds": "Number of seconds to wait"},
-                "example": "timer(seconds=5)"
-            },
-            "web_search": {
-                "description": "Search the web using DuckDuckGo",
-                "params": {
-                    "query": "Search query",
-                    "max_results": "Maximum results to return (default 5)"
-                },
-                "example": "web_search(query='python async tutorial')"
-            },
-            "http_fetch": {
-                "description": "Fetch content from a URL",
-                "params": {
-                    "url": "URL to fetch",
-                    "extract_text": "Extract text only (default True)"
-                },
-                "example": "http_fetch(url='https://example.com')"
-            },
             "code_execute": {
                 "description": "Execute Python code in a sandbox",
                 "params": {"code": "Python code to execute"},
                 "example": "code_execute(code='print(sum(range(10)))')"
-            },
-            "file_read": {
-                "description": "Read a file from the workspace",
-                "params": {"path": "Relative path within workspace"},
-                "example": "file_read(path='notes.txt')"
-            },
-            "file_write": {
-                "description": "Write content to a file in the workspace",
-                "params": {
-                    "path": "Relative path within workspace",
-                    "content": "Content to write"
-                },
-                "example": "file_write(path='output.txt', content='Hello')"
-            },
-            "file_list": {
-                "description": "List files in the workspace",
-                "params": {"path": "Relative directory path (default '.')"},
-                "example": "file_list(path='.')"
-            },
-            "shell_run": {
-                "description": "Run safe shell commands",
-                "params": {"command": "Shell command to execute"},
-                "example": "shell_run(command='ls -la')"
             },
             "json_parse": {
                 "description": "Parse JSON and extract data using path",
@@ -138,7 +63,7 @@ class ToolManager:
         }
 
     # ============================================
-    # Basic Tools
+    # Calculator (AST-based, no eval)
     # ============================================
 
     def _calculator(self, expression: str) -> dict[str, Any]:
@@ -241,144 +166,8 @@ class ToolManager:
         except Exception as e:
             return {"success": False, "error": str(e), "expression": expression}
 
-    def _timer(self, seconds: int) -> dict[str, Any]:
-        """Timer tool with maximum limit. Uses asyncio-compatible sleep when possible."""
-        seconds = min(max(0, seconds), 30)  # 0-30 seconds
-
-        # Check if we're in an async context and use non-blocking sleep
-        try:
-            loop = asyncio.get_running_loop()
-            # We're in an async context - schedule sleep without blocking
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                pool.submit(time.sleep, seconds).result()
-        except RuntimeError:
-            # No running event loop - safe to use blocking sleep
-            time.sleep(seconds)
-
-        return {"success": True, "elapsed": seconds}
-
     # ============================================
-    # Web Tools
-    # ============================================
-
-    def _web_search(
-        self, query: str, max_results: int = 5
-    ) -> dict[str, Any]:
-        """
-        Search the web using DuckDuckGo Instant Answer API.
-        No API key required.
-        """
-        try:
-            import httpx
-        except ImportError:
-            return {
-                "success": False,
-                "error": "httpx not installed. Run: pip install httpx"
-            }
-
-        try:
-            # DuckDuckGo Instant Answer API
-            url = f"https://api.duckduckgo.com/?q={quote_plus(query)}&format=json&no_html=1"
-
-            with httpx.Client(timeout=10.0) as client:
-                response = client.get(url)
-                data = response.json()
-
-            results = []
-
-            # Abstract (main answer)
-            if data.get("Abstract"):
-                results.append({
-                    "title": data.get("Heading", "Answer"),
-                    "snippet": data["Abstract"][:500],
-                    "url": data.get("AbstractURL", ""),
-                    "source": data.get("AbstractSource", "DuckDuckGo")
-                })
-
-            # Related topics
-            for topic in data.get("RelatedTopics", [])[:max_results]:
-                if isinstance(topic, dict) and topic.get("Text"):
-                    results.append({
-                        "title": topic.get("Text", "")[:100],
-                        "snippet": topic.get("Text", "")[:300],
-                        "url": topic.get("FirstURL", ""),
-                        "source": "DuckDuckGo"
-                    })
-
-            # Results (if available)
-            for result in data.get("Results", [])[:max_results]:
-                results.append({
-                    "title": result.get("Text", "")[:100],
-                    "snippet": result.get("Text", "")[:300],
-                    "url": result.get("FirstURL", ""),
-                    "source": "DuckDuckGo"
-                })
-
-            return {
-                "success": True,
-                "query": query,
-                "results": results[:max_results],
-                "total_found": len(results)
-            }
-
-        except Exception as e:
-            return {"success": False, "error": str(e), "query": query}
-
-    def _http_fetch(
-        self, url: str, extract_text: bool = True
-    ) -> dict[str, Any]:
-        """
-        Fetch content from a URL.
-        Optionally extracts text only (removes HTML tags).
-        """
-        try:
-            import httpx
-        except ImportError:
-            return {
-                "success": False,
-                "error": "httpx not installed. Run: pip install httpx"
-            }
-
-        # Validate URL
-        if not url.startswith(("http://", "https://")):
-            return {"success": False, "error": "Invalid URL scheme"}
-
-        try:
-            headers = {
-                "User-Agent": "SynthMind/1.0 (Educational AI Agent)"
-            }
-
-            with httpx.Client(timeout=15.0, follow_redirects=True) as client:
-                response = client.get(url, headers=headers)
-
-            content = response.text[:self.MAX_OUTPUT_LENGTH]
-            content_type = response.headers.get("content-type", "")
-
-            if extract_text and "text/html" in content_type:
-                # Simple HTML tag removal
-                text = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL)
-                text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-                text = re.sub(r'<[^>]+>', ' ', text)
-                text = re.sub(r'\s+', ' ', text).strip()
-                content = text[:self.MAX_OUTPUT_LENGTH]
-
-            return {
-                "success": True,
-                "url": url,
-                "status_code": response.status_code,
-                "content_type": content_type,
-                "content": content,
-                "length": len(content)
-            }
-
-        except httpx.TimeoutException:
-            return {"success": False, "error": "Request timed out", "url": url}
-        except Exception as e:
-            return {"success": False, "error": str(e), "url": url}
-
-    # ============================================
-    # Code Execution (Sandboxed)
+    # Code Execution (Sandboxed via multiprocessing)
     # ============================================
 
     def _code_execute(self, code: str) -> dict[str, Any]:
@@ -405,7 +194,6 @@ class ToolManager:
 
         try:
             process.start()
-            # ACTUALLY ENFORCE TIMEOUT - this was missing before!
             process.join(timeout=self.MAX_CODE_EXECUTION_TIME)
 
             if process.is_alive():
@@ -413,7 +201,6 @@ class ToolManager:
                 process.terminate()
                 process.join(timeout=1)
                 if process.is_alive():
-                    # Force kill if still running
                     process.kill()
                     process.join()
                 return {
@@ -437,7 +224,6 @@ class ToolManager:
                 "error": f"Sandbox error: {type(e).__name__}: {str(e)}"
             }
         finally:
-            # Ensure process is cleaned up
             if process.is_alive():
                 process.kill()
                 process.join()
@@ -454,12 +240,10 @@ class ToolManager:
 
         # Set resource limits (Unix only) - prevents memory bombs
         try:
-            # Limit memory to 100MB
             resource.setrlimit(resource.RLIMIT_AS, (100 * 1024 * 1024, 100 * 1024 * 1024))
-            # Limit CPU time to 10 seconds
             resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
         except (OSError, ValueError):
-            pass  # Not available on all systems
+            pass
 
         # Restricted builtins - no dangerous operations
         safe_builtins = {
@@ -495,13 +279,11 @@ class ToolManager:
             "collections": collections,
         }
 
-        # Restricted import that only allows safe modules
         def restricted_import(name, globals=None, locals=None, fromlist=(), level=0):
             if name in safe_modules:
                 return safe_modules[name]
             raise ImportError(f"Module '{name}' is not allowed in sandbox")
 
-        # Add restricted import to builtins
         safe_builtins["__import__"] = restricted_import
 
         restricted_globals = {
@@ -531,205 +313,7 @@ class ToolManager:
             })
 
     # ============================================
-    # File Operations (Sandboxed to workspace)
-    # ============================================
-
-    def _validate_path(self, path: str) -> Optional[Path]:
-        """Validate path is within workspace."""
-        try:
-            # Resolve to absolute path
-            target = (self.workspace / path).resolve()
-            # Ensure it's within workspace
-            if self.workspace.resolve() in target.parents or target == self.workspace.resolve():
-                return target
-            if target.is_relative_to(self.workspace.resolve()):
-                return target
-            return None
-        except Exception:
-            return None
-
-    def _file_read(self, path: str) -> dict[str, Any]:
-        """Read a file from the workspace directory."""
-        target = self._validate_path(path)
-        if not target:
-            return {"success": False, "error": "Path outside workspace"}
-
-        if not target.exists():
-            return {"success": False, "error": f"File not found: {path}"}
-
-        if not target.is_file():
-            return {"success": False, "error": f"Not a file: {path}"}
-
-        try:
-            size = target.stat().st_size
-            if size > self.MAX_FILE_SIZE:
-                return {
-                    "success": False,
-                    "error": f"File too large ({size} bytes, max {self.MAX_FILE_SIZE})"
-                }
-
-            content = target.read_text(encoding="utf-8")
-            return {
-                "success": True,
-                "path": path,
-                "content": content[:self.MAX_OUTPUT_LENGTH],
-                "size": size,
-                "truncated": size > self.MAX_OUTPUT_LENGTH
-            }
-        except UnicodeDecodeError:
-            return {"success": False, "error": "Binary file cannot be read as text"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    def _file_write(self, path: str, content: str) -> dict[str, Any]:
-        """Write content to a file in the workspace directory."""
-        target = self._validate_path(path)
-        if not target:
-            return {"success": False, "error": "Path outside workspace"}
-
-        try:
-            # Create parent directories if needed
-            target.parent.mkdir(parents=True, exist_ok=True)
-
-            # Write content
-            target.write_text(content, encoding="utf-8")
-
-            return {
-                "success": True,
-                "path": path,
-                "size": len(content),
-                "absolute_path": str(target)
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    def _file_list(self, path: str = ".") -> dict[str, Any]:
-        """List files and directories in the workspace."""
-        target = self._validate_path(path)
-        if not target:
-            return {"success": False, "error": "Path outside workspace"}
-
-        if not target.exists():
-            return {"success": False, "error": f"Directory not found: {path}"}
-
-        if not target.is_dir():
-            return {"success": False, "error": f"Not a directory: {path}"}
-
-        try:
-            items = []
-            for item in sorted(target.iterdir()):
-                rel_path = item.relative_to(self.workspace)
-                items.append({
-                    "name": item.name,
-                    "path": str(rel_path),
-                    "type": "directory" if item.is_dir() else "file",
-                    "size": item.stat().st_size if item.is_file() else None
-                })
-
-            return {
-                "success": True,
-                "path": path,
-                "items": items,
-                "count": len(items)
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    # ============================================
-    # Shell Commands (Restricted)
-    # ============================================
-
-    def _shell_run(self, command: str) -> dict[str, Any]:
-        """
-        Run restricted shell commands safely.
-        Uses list-based execution to prevent command injection.
-        Only allows safe, read-only commands.
-        """
-        # Parse command using shlex for proper shell-like tokenization
-        try:
-            parts = shlex.split(command)
-        except ValueError as e:
-            return {"success": False, "error": f"Invalid command syntax: {e}"}
-
-        if not parts:
-            return {"success": False, "error": "Empty command"}
-
-        base_cmd = parts[0]
-
-        # Check if command is allowed
-        if base_cmd not in self.ALLOWED_SHELL_COMMANDS:
-            return {
-                "success": False,
-                "error": f"Command '{base_cmd}' not allowed. Allowed: {', '.join(sorted(self.ALLOWED_SHELL_COMMANDS))}"
-            }
-
-        # Validate each argument for dangerous patterns
-        dangerous_patterns = [
-            r'\.\.',           # Parent directory traversal
-            r'^/etc/',         # Sensitive system paths
-            r'^/root/',
-            r'^/home/',
-            r'^/proc/',
-            r'^/sys/',
-            r'^/dev/',
-        ]
-
-        for arg in parts[1:]:
-            # Check for dangerous path patterns
-            for pattern in dangerous_patterns:
-                if re.search(pattern, arg):
-                    return {
-                        "success": False,
-                        "error": f"Argument contains disallowed path pattern: {arg}"
-                    }
-
-            # Validate paths are within workspace for file-accessing commands
-            if base_cmd in {"head", "tail", "wc", "sort", "uniq", "diff"}:
-                if arg.startswith('-'):
-                    # It's a flag, check if it's blocked
-                    blocked = self.BLOCKED_ARGS.get(base_cmd, set())
-                    if arg in blocked:
-                        return {
-                            "success": False,
-                            "error": f"Argument '{arg}' not allowed for {base_cmd}"
-                        }
-                elif not arg.startswith('-'):
-                    # It's a file path - validate it's in workspace
-                    validated_path = self._validate_path(arg)
-                    if validated_path is None:
-                        return {
-                            "success": False,
-                            "error": f"Path must be within workspace: {arg}"
-                        }
-
-        try:
-            # SECURITY: Use list-based execution, NOT shell=True
-            result = subprocess.run(
-                parts,  # List of arguments, not a string
-                shell=False,  # CRITICAL: Never use shell=True with user input
-                capture_output=True,
-                text=True,
-                timeout=10,
-                cwd=str(self.workspace)
-            )
-
-            return {
-                "success": result.returncode == 0,
-                "command": command,
-                "stdout": result.stdout[:self.MAX_OUTPUT_LENGTH],
-                "stderr": result.stderr[:self.MAX_OUTPUT_LENGTH],
-                "return_code": result.returncode
-            }
-
-        except subprocess.TimeoutExpired:
-            return {"success": False, "error": "Command timed out", "command": command}
-        except FileNotFoundError:
-            return {"success": False, "error": f"Command not found: {base_cmd}", "command": command}
-        except Exception as e:
-            return {"success": False, "error": str(e), "command": command}
-
-    # ============================================
-    # Data Tools
+    # JSON Parser
     # ============================================
 
     def _json_parse(
@@ -740,13 +324,11 @@ class ToolManager:
         Path examples: 'users.0.name', 'config.settings.theme'
         """
         try:
-            # Parse if string
             if isinstance(data, str):
                 parsed = json.loads(data)
             else:
                 parsed = data
 
-            # Navigate path
             if path:
                 result = parsed
                 for key in path.split('.'):
@@ -793,7 +375,6 @@ class ToolManager:
             tool_func = self.available_tools[tool_name]
             return tool_func(**kwargs)
         except TypeError as e:
-            # Wrong arguments
             desc = self.tool_descriptions.get(tool_name, {})
             return {
                 "success": False,
