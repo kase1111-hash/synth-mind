@@ -16,6 +16,7 @@ import numpy as np
 # Optional: FAISS for vector search
 try:
     import faiss
+
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
@@ -24,6 +25,7 @@ except ImportError:
 # Optional: sentence-transformers for local embeddings
 try:
     from sentence_transformers import SentenceTransformer
+
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
@@ -31,6 +33,7 @@ except ImportError:
 # Optional: OpenAI for cloud embeddings
 try:
     import openai
+
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -54,7 +57,7 @@ class EmbeddingProvider:
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             try:
                 # all-MiniLM-L6-v2 is fast and produces 384-dim embeddings
-                self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                self.model = SentenceTransformer("all-MiniLM-L6-v2")
                 self.dimension = 384
                 self.provider_name = "sentence-transformers"
                 print("✓ Using sentence-transformers for embeddings")
@@ -76,7 +79,9 @@ class EmbeddingProvider:
         # Fallback to hash-based (deterministic but not semantic)
         self.provider_name = "hash-fallback"
         self.dimension = 384
-        print("⚠️  Using hash-based fallback embeddings (install sentence-transformers for better quality)")
+        print(
+            "⚠️  Using hash-based fallback embeddings (install sentence-transformers for better quality)"
+        )
 
     def embed(self, text: str) -> np.ndarray:
         """Generate embedding for text using the best available provider."""
@@ -105,10 +110,7 @@ class EmbeddingProvider:
     def _embed_openai(self, text: str) -> np.ndarray:
         """Embed using OpenAI API (synchronous - use embed_async for async contexts)."""
         try:
-            response = self.model.embeddings.create(
-                model="text-embedding-3-small",
-                input=text
-            )
+            response = self.model.embeddings.create(model="text-embedding-3-small", input=text)
             return np.array(response.data[0].embedding, dtype=np.float32)
         except Exception as e:
             print(f"⚠️  OpenAI embedding failed: {e}, using fallback")
@@ -117,11 +119,13 @@ class EmbeddingProvider:
     async def embed_async(self, text: str) -> np.ndarray:
         """Generate embedding asynchronously (safe for async contexts)."""
         import asyncio
+
         return await asyncio.to_thread(self.embed, text)
 
     async def embed_batch_async(self, texts: list[str]) -> np.ndarray:
         """Generate embeddings for multiple texts asynchronously."""
         import asyncio
+
         return await asyncio.to_thread(self.embed_batch, texts)
 
     def _embed_hash_fallback(self, text: str) -> np.ndarray:
@@ -139,6 +143,7 @@ class EmbeddingProvider:
         if norm_a == 0 or norm_b == 0:
             return 0.0
         return float(np.dot(a, b) / (norm_a * norm_b))
+
 
 class MemorySystem:
     """Hybrid memory system with episodic and semantic storage."""
@@ -325,9 +330,7 @@ class MemorySystem:
             return self.embedding_provider.embed_batch(texts)
         return np.array([self.embed(t) for t in texts], dtype=np.float32)
 
-    def store_episodic(
-        self, event: str, content: dict[str, Any], valence: float = 0.0
-    ):
+    def store_episodic(self, event: str, content: dict[str, Any], valence: float = 0.0):
         """Store episodic memory."""
         cursor = self.db.cursor()
         cursor.execute(
@@ -335,13 +338,7 @@ class MemorySystem:
             INSERT INTO episodes (timestamp, event_type, content, valence, metadata)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (
-                time.time(),
-                event,
-                json.dumps(content),
-                valence,
-                json.dumps({})
-            )
+            (time.time(), event, json.dumps(content), valence, json.dumps({})),
         )
         self.db.commit()
 
@@ -355,17 +352,19 @@ class MemorySystem:
             ORDER BY id DESC
             LIMIT ?
             """,
-            (n,)
+            (n,),
         )
 
         results = []
         for row in cursor.fetchall():
-            results.append({
-                "event": row[0],
-                "content": json.loads(row[1]),
-                "valence": row[2],
-                "timestamp": row[3]
-            })
+            results.append(
+                {
+                    "event": row[0],
+                    "content": json.loads(row[1]),
+                    "valence": row[2],
+                    "timestamp": row[3],
+                }
+            )
 
         return results
 
@@ -380,7 +379,7 @@ class MemorySystem:
             INSERT INTO turns (timestamp, user_input, assistant_response, metadata)
             VALUES (?, ?, ?, ?)
             """,
-            (time.time(), user_input, assistant_response, json.dumps({}))
+            (time.time(), user_input, assistant_response, json.dumps({})),
         )
         self.db.commit()
 
@@ -392,17 +391,14 @@ class MemorySystem:
             INSERT OR REPLACE INTO long_term (key, value, updated_at)
             VALUES (?, ?, ?)
             """,
-            (key, json.dumps(value), time.time())
+            (key, json.dumps(value), time.time()),
         )
         self.db.commit()
 
     def retrieve_persistent(self, key: str) -> Optional[Any]:
         """Retrieve persistent data."""
         cursor = self.db.cursor()
-        cursor.execute(
-            "SELECT value FROM long_term WHERE key = ?",
-            (key,)
-        )
+        cursor.execute("SELECT value FROM long_term WHERE key = ?", (key,))
         row = cursor.fetchone()
         return json.loads(row[0]) if row else None
 
@@ -423,7 +419,7 @@ class MemorySystem:
         content: str,
         category: str = "general",
         importance: float = 0.5,
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
     ) -> int:
         """
         Store a semantic memory with vector embedding.
@@ -435,13 +431,7 @@ class MemorySystem:
             INSERT INTO semantic_memories (timestamp, content, category, importance, metadata)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (
-                time.time(),
-                content,
-                category,
-                importance,
-                json.dumps(metadata or {})
-            )
+            (time.time(), content, category, importance, json.dumps(metadata or {})),
         )
         self.db.commit()
         memory_id = cursor.lastrowid
@@ -465,11 +455,7 @@ class MemorySystem:
         return memory_id
 
     def search_semantic(
-        self,
-        query: str,
-        k: int = 5,
-        category: Optional[str] = None,
-        min_similarity: float = 0.0
+        self, query: str, k: int = 5, category: Optional[str] = None, min_similarity: float = 0.0
     ) -> list[dict]:
         """
         Search semantic memories by similarity to query.
@@ -489,7 +475,9 @@ class MemorySystem:
         # Search vector store
         if FAISS_AVAILABLE:
             query_embedding = query_embedding.reshape(1, -1)
-            similarities, indices = self.vector_store.search(query_embedding, min(k * 2, len(self.semantic_id_map)))
+            similarities, indices = self.vector_store.search(
+                query_embedding, min(k * 2, len(self.semantic_id_map))
+            )
             results = []
             for sim, idx in zip(similarities[0], indices[0]):
                 if idx < 0 or idx >= len(self.semantic_id_map):
@@ -506,7 +494,7 @@ class MemorySystem:
                 if sim >= min_similarity:
                     similarities.append((db_id, sim))
             similarities.sort(key=lambda x: x[1], reverse=True)
-            results = similarities[:k * 2]
+            results = similarities[: k * 2]
 
         # Fetch from database
         memories = []
@@ -517,39 +505,35 @@ class MemorySystem:
                 SELECT id, timestamp, content, category, importance, metadata
                 FROM semantic_memories WHERE id = ?
                 """,
-                (db_id,)
+                (db_id,),
             )
             row = cursor.fetchone()
             if row:
                 # Filter by category if specified
                 if category and row[3] != category:
                     continue
-                memories.append({
-                    "id": row[0],
-                    "timestamp": row[1],
-                    "content": row[2],
-                    "category": row[3],
-                    "importance": row[4],
-                    "metadata": json.loads(row[5]) if row[5] else {},
-                    "similarity": similarity
-                })
+                memories.append(
+                    {
+                        "id": row[0],
+                        "timestamp": row[1],
+                        "content": row[2],
+                        "category": row[3],
+                        "importance": row[4],
+                        "metadata": json.loads(row[5]) if row[5] else {},
+                        "similarity": similarity,
+                    }
+                )
 
         return memories
 
     def get_related_memories(
-        self,
-        text: str,
-        k: int = 3,
-        include_episodic: bool = True
+        self, text: str, k: int = 3, include_episodic: bool = True
     ) -> dict[str, list[dict]]:
         """
         Get memories related to text from multiple sources.
         Combines semantic search with recent episodic memories.
         """
-        result = {
-            "semantic": self.search_semantic(text, k=k),
-            "episodic": []
-        }
+        result = {"semantic": self.search_semantic(text, k=k), "episodic": []}
 
         if include_episodic:
             # Get recent episodic and score by text similarity
@@ -563,10 +547,7 @@ class MemorySystem:
                     sim = EmbeddingProvider.cosine_similarity(text_emb, ep_emb)
                     scored.append((ep, sim))
                 scored.sort(key=lambda x: x[1], reverse=True)
-                result["episodic"] = [
-                    {**ep, "similarity": sim}
-                    for ep, sim in scored[:k]
-                ]
+                result["episodic"] = [{**ep, "similarity": sim} for ep, sim in scored[:k]]
 
         return result
 
@@ -655,12 +636,14 @@ class MemorySystem:
         total_memories = cursor.fetchone()[0]
 
         return {
-            "provider": self.embedding_provider.provider_name if self.embedding_provider else "none",
+            "provider": (
+                self.embedding_provider.provider_name if self.embedding_provider else "none"
+            ),
             "dimension": self.dimension,
             "total_semantic_memories": total_memories,
             "index_size": len(self.semantic_id_map),
             "context_embeddings_tracked": len(self._context_embeddings),
-            "faiss_available": FAISS_AVAILABLE
+            "faiss_available": FAISS_AVAILABLE,
         }
 
     # ============================================
@@ -673,7 +656,7 @@ class MemorySystem:
         parsed_intent: str,
         confidence_score: float,
         context: str,
-        signals: dict[str, float]
+        signals: dict[str, float],
     ) -> int:
         """
         Log an uncertainty event for later pattern analysis.
@@ -693,8 +676,8 @@ class MemorySystem:
                 parsed_intent,
                 confidence_score,
                 context[:2000] if context else "",  # Limit context size
-                json.dumps(signals)
-            )
+                json.dumps(signals),
+            ),
         )
         self.db.commit()
         return cursor.lastrowid
@@ -704,7 +687,7 @@ class MemorySystem:
         limit: int = 500,
         unresolved_only: bool = False,
         min_confidence: float = 0.0,
-        max_confidence: float = 1.0
+        max_confidence: float = 1.0,
     ) -> list[dict]:
         """
         Retrieve uncertainty logs for pattern analysis.
@@ -730,25 +713,23 @@ class MemorySystem:
 
         results = []
         for row in cursor.fetchall():
-            results.append({
-                "id": row[0],
-                "timestamp": row[1],
-                "user_message": row[2],
-                "parsed_intent": row[3],
-                "confidence_score": row[4],
-                "context": row[5],
-                "signals": json.loads(row[6]) if row[6] else {},
-                "resolved": bool(row[7]),
-                "resolution_pattern": row[8]
-            })
+            results.append(
+                {
+                    "id": row[0],
+                    "timestamp": row[1],
+                    "user_message": row[2],
+                    "parsed_intent": row[3],
+                    "confidence_score": row[4],
+                    "context": row[5],
+                    "signals": json.loads(row[6]) if row[6] else {},
+                    "resolved": bool(row[7]),
+                    "resolution_pattern": row[8],
+                }
+            )
 
         return results
 
-    def mark_uncertainty_resolved(
-        self,
-        log_id: int,
-        resolution_pattern: str
-    ):
+    def mark_uncertainty_resolved(self, log_id: int, resolution_pattern: str):
         """
         Mark an uncertainty log entry as resolved with the pattern that fixed it.
         Called after pattern harvest identifies a fix.
@@ -760,7 +741,7 @@ class MemorySystem:
             SET resolved = 1, resolution_pattern = ?
             WHERE id = ?
             """,
-            (resolution_pattern, log_id)
+            (resolution_pattern, log_id),
         )
         self.db.commit()
 
@@ -782,10 +763,7 @@ class MemorySystem:
 
         # Recent count (last 24 hours)
         day_ago = time.time() - 86400
-        cursor.execute(
-            "SELECT COUNT(*) FROM uncertainty_log WHERE timestamp > ?",
-            (day_ago,)
-        )
+        cursor.execute("SELECT COUNT(*) FROM uncertainty_log WHERE timestamp > ?", (day_ago,))
         recent = cursor.fetchone()[0]
 
         return {
@@ -794,7 +772,7 @@ class MemorySystem:
             "resolved": total - unresolved,
             "resolution_rate": (total - unresolved) / total if total > 0 else 0.0,
             "avg_confidence": avg_confidence,
-            "last_24h": recent
+            "last_24h": recent,
         }
 
     async def save_state(self):
@@ -803,13 +781,10 @@ class MemorySystem:
             self.db.commit()
 
         if FAISS_AVAILABLE and self.vector_store:
-            faiss.write_index(
-                self.vector_store,
-                str(self.embeddings_path / "index.faiss")
-            )
+            faiss.write_index(self.vector_store, str(self.embeddings_path / "index.faiss"))
 
         # Save semantic ID mapping
         if self.semantic_id_map:
             id_map_path = self.embeddings_path / "id_map.json"
-            with open(id_map_path, 'w') as f:
+            with open(id_map_path, "w") as f:
                 json.dump(self.semantic_id_map, f)

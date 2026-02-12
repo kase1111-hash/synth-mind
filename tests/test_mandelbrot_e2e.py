@@ -49,7 +49,9 @@ def test_mandelbrot_weighting_class():
     for word in test_words:
         weight = mw.compute_weight(word)
         explanation = mw.explain_weight(word)
-        print(f"    '{word}': {weight:.3f} (rank={explanation['rank']}, stopword={explanation['is_stopword']})")
+        print(
+            f"    '{word}': {weight:.3f} (rank={explanation['rank']}, stopword={explanation['is_stopword']})"
+        )
 
     # Test weighted word scoring
     hedge_words = ["maybe", "perhaps", "might", "possibly", "conceivably"]
@@ -103,7 +105,9 @@ def test_mandelbrot_weighting_class():
     print(f"    Generic: '{generic_text}' → {generic_importance:.3f}")
 
     # Test top weighted words
-    analysis_text = "Please schedule an ephemeral backup for the critical production database server"
+    analysis_text = (
+        "Please schedule an ephemeral backup for the critical production database server"
+    )
     top_words = mw.get_top_weighted_words(analysis_text, n=5)
     print(f"\n  Top weighted words in: '{analysis_text}'")
     for word, weight in top_words:
@@ -158,18 +162,14 @@ def test_assurance_module_integration():
         "enabled": True,
         "alpha": 1.0,
         "beta": 2.5,
-        "domain_boosts": {
-            "ephemeral": 2.0,
-            "critical": 1.8,
-            "urgent": 1.7
-        }
+        "domain_boosts": {"ephemeral": 2.0, "critical": 1.8, "urgent": 1.7},
     }
 
     module = AssuranceResolutionModule(
         llm=MockLLM(),
         memory=MockMemory(),
         emotion_regulator=MockEmotion(),
-        mandelbrot_config=config
+        mandelbrot_config=config,
     )
 
     assert module.mandelbrot is not None, "Mandelbrot should be initialized"
@@ -198,7 +198,9 @@ def test_assurance_module_integration():
     print("\n  ✓ Hedging response correctly has higher uncertainty")
 
     # Risky response with absolutes
-    risky_response = "This will definitely always work. I guarantee it will never fail under any circumstances."
+    risky_response = (
+        "This will definitely always work. I guarantee it will never fail under any circumstances."
+    )
     uncertainty3, signals3 = module.assess_uncertainty(risky_response, {}, "")
     print("\n  Risky response (with absolutes):")
     print(f"    Text: '{risky_response[:50]}...'")
@@ -230,7 +232,9 @@ def test_assurance_module_integration():
     # Test word weight explanation
     print("\n  Testing word weight explanation:")
     explanation = module.explain_word_weight("ephemeral")
-    print(f"    'ephemeral': weight={explanation['weight']:.3f}, boost={explanation['domain_boost']}")
+    print(
+        f"    'ephemeral': weight={explanation['weight']:.3f}, boost={explanation['domain_boost']}"
+    )
     assert explanation["has_domain_boost"], "ephemeral should have domain boost"
     print("  ✓ Word weight explanation works")
 
@@ -325,12 +329,14 @@ def test_full_cycle():
         llm=MockLLM(),
         memory=MockMemory(),
         emotion_regulator=emotion,
-        mandelbrot_config={"enabled": True, "alpha": 1.0, "beta": 2.5}
+        mandelbrot_config={"enabled": True, "alpha": 1.0, "beta": 2.5},
     )
 
     # Simulate a conversation turn
     user_message = "Can you schedule an urgent backup of my critical production database?"
-    response = "I'll schedule the backup immediately. The process should complete within 15 minutes."
+    response = (
+        "I'll schedule the backup immediately. The process should complete within 15 minutes."
+    )
 
     print(f"  User: '{user_message}'")
     print(f"  Response: '{response}'")
@@ -339,7 +345,7 @@ def test_full_cycle():
         response=response,
         context="Production database management session",
         reasoning_trace={},
-        user_message=user_message
+        user_message=user_message,
     )
 
     print("\n  Cycle results:")
@@ -369,6 +375,7 @@ def main():
     except Exception as e:
         print(f"\n✗ TEST 1 FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         results.append(("MandelbrotWeighting Class", False))
 
@@ -377,6 +384,7 @@ def main():
     except Exception as e:
         print(f"\n✗ TEST 2 FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         results.append(("AssuranceModule Integration", False))
 
@@ -385,6 +393,7 @@ def main():
     except Exception as e:
         print(f"\n✗ TEST 3 FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         results.append(("Config Loading", False))
 
@@ -393,6 +402,7 @@ def main():
     except Exception as e:
         print(f"\n✗ TEST 4 FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         results.append(("Full Cycle", False))
 

@@ -17,21 +17,22 @@ try:
     import jwt
 except ImportError as err:
     raise ImportError(
-        "PyJWT is required for authentication. "
-        "Install it with: pip install PyJWT"
+        "PyJWT is required for authentication. " "Install it with: pip install PyJWT"
     ) from err
 
 
 class UserRole(Enum):
     """User permission levels."""
-    ADMIN = "admin"          # Full access
-    OPERATOR = "operator"    # Can control, no user management
-    VIEWER = "viewer"        # Read-only access
+
+    ADMIN = "admin"  # Full access
+    OPERATOR = "operator"  # Can control, no user management
+    VIEWER = "viewer"  # Read-only access
 
 
 @dataclass
 class User:
     """User account data."""
+
     username: str
     password_hash: str
     salt: str
@@ -48,11 +49,11 @@ class User:
             "role": self.role.value,
             "created_at": self.created_at,
             "last_login": self.last_login,
-            "active": self.active
+            "active": self.active,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'User':
+    def from_dict(cls, data: dict) -> "User":
         return cls(
             username=data["username"],
             password_hash=data["password_hash"],
@@ -60,7 +61,7 @@ class User:
             role=UserRole(data["role"]),
             created_at=data.get("created_at", datetime.now().isoformat()),
             last_login=data.get("last_login"),
-            active=data.get("active", True)
+            active=data.get("active", True),
         )
 
 
@@ -114,7 +115,7 @@ class AuthManager:
 
     def _save_config(self, config: dict):
         """Save authentication configuration."""
-        with open(self.config_file, 'w') as f:
+        with open(self.config_file, "w") as f:
             json.dump(config, f, indent=2)
         os.chmod(self.config_file, 0o600)  # Secure permissions
 
@@ -124,14 +125,13 @@ class AuthManager:
             with open(self.users_file) as f:
                 data = json.load(f)
                 self.users = {
-                    username: User.from_dict(user_data)
-                    for username, user_data in data.items()
+                    username: User.from_dict(user_data) for username, user_data in data.items()
                 }
 
     def _save_users(self):
         """Save users to storage."""
         data = {username: user.to_dict() for username, user in self.users.items()}
-        with open(self.users_file, 'w') as f:
+        with open(self.users_file, "w") as f:
             json.dump(data, f, indent=2)
         os.chmod(self.users_file, 0o600)  # Secure permissions
 
@@ -145,8 +145,7 @@ class AuthManager:
                     now = datetime.now().timestamp()
                     # Only keep tokens that haven't expired yet
                     self.blacklisted_tokens = {
-                        token for token, exp_time in data.items()
-                        if exp_time > now
+                        token for token, exp_time in data.items() if exp_time > now
                     }
                     # Clean up expired tokens from file
                     self._save_blacklist()
@@ -167,7 +166,7 @@ class AuthManager:
                 # If we can't decode, keep it for 24 hours
                 data[token] = (datetime.now() + timedelta(hours=24)).timestamp()
 
-        with open(self.blacklist_file, 'w') as f:
+        with open(self.blacklist_file, "w") as f:
             json.dump(data, f, indent=2)
         os.chmod(self.blacklist_file, 0o600)  # Secure permissions
 
@@ -183,10 +182,7 @@ class AuthManager:
 
         # Use PBKDF2 with SHA256
         password_hash = hashlib.pbkdf2_hmac(
-            'sha256',
-            password.encode('utf-8'),
-            salt.encode('utf-8'),
-            100000  # iterations
+            "sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000  # iterations
         ).hex()
 
         return password_hash, salt
@@ -198,7 +194,9 @@ class AuthManager:
 
     # User Management
 
-    def create_user(self, username: str, password: str, role: UserRole = UserRole.VIEWER) -> tuple[bool, str]:
+    def create_user(
+        self, username: str, password: str, role: UserRole = UserRole.VIEWER
+    ) -> tuple[bool, str]:
         """
         Create a new user account.
 
@@ -214,10 +212,7 @@ class AuthManager:
         password_hash, salt = self._hash_password(password)
 
         self.users[username] = User(
-            username=username,
-            password_hash=password_hash,
-            salt=salt,
-            role=role
+            username=username, password_hash=password_hash, salt=salt, role=role
         )
         self._save_users()
 
@@ -266,7 +261,7 @@ class AuthManager:
                 "role": user.role.value,
                 "created_at": user.created_at,
                 "last_login": user.last_login,
-                "active": user.active
+                "active": user.active,
             }
             for user in self.users.values()
         ]
@@ -308,10 +303,7 @@ class AuthManager:
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": self.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": {
-                "username": user.username,
-                "role": user.role.value
-            }
+            "user": {"username": user.username, "role": user.role.value},
         }
 
     def _generate_access_token(self, user: User) -> str:
@@ -322,7 +314,7 @@ class AuthManager:
             "type": "access",
             "exp": datetime.utcnow() + timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES),
             "iat": datetime.utcnow(),
-            "jti": secrets.token_hex(16)  # Unique token ID
+            "jti": secrets.token_hex(16),  # Unique token ID
         }
         return jwt.encode(payload, self.secret_key, algorithm="HS256")
 
@@ -333,7 +325,7 @@ class AuthManager:
             "type": "refresh",
             "exp": datetime.utcnow() + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS),
             "iat": datetime.utcnow(),
-            "jti": secrets.token_hex(16)
+            "jti": secrets.token_hex(16),
         }
         return jwt.encode(payload, self.secret_key, algorithm="HS256")
 
@@ -386,7 +378,7 @@ class AuthManager:
         return True, {
             "access_token": access_token,
             "token_type": "bearer",
-            "expires_in": self.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            "expires_in": self.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         }
 
     def logout(self, token: str):
@@ -411,11 +403,7 @@ class AuthManager:
         user_role = UserRole(payload["role"])
 
         # Role hierarchy: ADMIN > OPERATOR > VIEWER
-        role_levels = {
-            UserRole.ADMIN: 3,
-            UserRole.OPERATOR: 2,
-            UserRole.VIEWER: 1
-        }
+        role_levels = {UserRole.ADMIN: 3, UserRole.OPERATOR: 2, UserRole.VIEWER: 1}
 
         if role_levels[user_role] >= role_levels[required_role]:
             return True, payload["sub"]
@@ -450,7 +438,7 @@ def create_auth_middleware(auth_manager: AuthManager, public_paths: list = None)
         auth_manager: AuthManager instance
         public_paths: List of paths that don't require authentication
     """
-    public_paths = public_paths or ['/api/auth/login', '/api/auth/setup', '/api/auth/status']
+    public_paths = public_paths or ["/api/auth/login", "/api/auth/setup", "/api/auth/status"]
 
     @aiohttp.web.middleware
     async def auth_middleware(request, handler):
@@ -459,29 +447,25 @@ def create_auth_middleware(auth_manager: AuthManager, public_paths: list = None)
             return await handler(request)
 
         # Skip auth for static files and WebSocket upgrade
-        if request.path == '/' or request.path == '/ws':
+        if request.path == "/" or request.path == "/ws":
             return await handler(request)
 
         # Extract token from Authorization header
-        auth_header = request.headers.get('Authorization', '')
+        auth_header = request.headers.get("Authorization", "")
 
-        if not auth_header.startswith('Bearer '):
+        if not auth_header.startswith("Bearer "):
             return aiohttp.web.json_response(
-                {"error": "Missing or invalid authorization header"},
-                status=401
+                {"error": "Missing or invalid authorization header"}, status=401
             )
 
         token = auth_header[7:]  # Remove 'Bearer ' prefix
         valid, payload = auth_manager.validate_token(token)
 
         if not valid:
-            return aiohttp.web.json_response(
-                {"error": "Invalid or expired token"},
-                status=401
-            )
+            return aiohttp.web.json_response({"error": "Invalid or expired token"}, status=401)
 
         # Add user info to request
-        request['user'] = payload
+        request["user"] = payload
         return await handler(request)
 
     return auth_middleware

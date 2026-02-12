@@ -19,7 +19,7 @@ class EmotionRegulator:
         self,
         initial_valence: float = 0.0,
         initial_arousal: float = 0.0,
-        initial_dominance: float = 0.0
+        initial_dominance: float = 0.0,
     ):
         # PAD model dimensions, each in [-1, 1]
         self.current_valence = initial_valence
@@ -37,8 +37,12 @@ class EmotionRegulator:
         self.baseline_dominance = 0.0
 
     def apply_reward_signal(
-        self, valence: float, label: str, intensity: float = 1.0,
-        arousal_delta: float = 0.0, dominance_delta: float = 0.0
+        self,
+        valence: float,
+        label: str,
+        intensity: float = 1.0,
+        arousal_delta: float = 0.0,
+        dominance_delta: float = 0.0,
     ):
         """
         Apply emotional reward/punishment signal across PAD dimensions.
@@ -72,16 +76,18 @@ class EmotionRegulator:
         self.current_dominance = max(-1.0, min(1.0, self.current_dominance))
 
         # Log event
-        self.emotional_events.append({
-            "label": label,
-            "valence": valence,
-            "intensity": intensity,
-            "resulting_state": {
-                "valence": self.current_valence,
-                "arousal": self.current_arousal,
-                "dominance": self.current_dominance,
+        self.emotional_events.append(
+            {
+                "label": label,
+                "valence": valence,
+                "intensity": intensity,
+                "resulting_state": {
+                    "valence": self.current_valence,
+                    "arousal": self.current_arousal,
+                    "dominance": self.current_dominance,
+                },
             }
-        })
+        )
 
         # Track history
         self.valence_history.append(self.current_valence)
@@ -148,7 +154,7 @@ class EmotionRegulator:
             "arousal": self.current_arousal,
             "dominance": self.current_dominance,
             "tags": self.mood_tags,
-            "recent_events": self.emotional_events[-5:]
+            "recent_events": self.emotional_events[-5:],
         }
 
     def get_current_state(self) -> str:
@@ -175,8 +181,7 @@ class EmotionRegulator:
             parts.append("Respond with a warm, supportive tone.")
         elif self.current_valence < -0.5:
             parts.append(
-                "Respond with care and caution. Something feels off — "
-                "be gentle and measured."
+                "Respond with care and caution. Something feels off — " "be gentle and measured."
             )
         elif self.current_valence < -0.2:
             parts.append("Respond thoughtfully. Be slightly more careful than usual.")
@@ -188,15 +193,12 @@ class EmotionRegulator:
                 "Feel free to explore tangential ideas."
             )
         elif self.current_arousal < -0.3:
-            parts.append(
-                "Be concise and measured. Keep responses focused and brief."
-            )
+            parts.append("Be concise and measured. Keep responses focused and brief.")
 
         # Dominance → assertiveness
         if self.current_dominance > 0.4:
             parts.append(
-                "Be direct and confident in your statements. "
-                "Minimize hedging language."
+                "Be direct and confident in your statements. " "Minimize hedging language."
             )
         elif self.current_dominance < -0.3:
             parts.append(

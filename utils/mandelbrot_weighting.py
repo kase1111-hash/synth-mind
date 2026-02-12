@@ -43,21 +43,136 @@ class MandelbrotWeighting:
 
     # Default English stopwords (low information value)
     DEFAULT_STOPWORDS = {
-        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "could",
-        "should", "may", "might", "must", "shall", "can", "need", "dare",
-        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
-        "into", "through", "during", "before", "after", "above", "below",
-        "between", "under", "again", "further", "then", "once", "here",
-        "there", "when", "where", "why", "how", "all", "each", "few",
-        "more", "most", "other", "some", "such", "no", "nor", "not",
-        "only", "own", "same", "so", "than", "too", "very", "just",
-        "and", "but", "if", "or", "because", "until", "while", "about", "against", "i", "me", "my", "myself", "we", "our", "ours", "ourselves",
-        "you", "your", "yours", "yourself", "yourselves", "he", "him",
-        "his", "himself", "she", "her", "hers", "herself", "it", "its",
-        "itself", "they", "them", "their", "theirs", "themselves",
-        "what", "which", "who", "whom", "this", "that", "these", "those",
-        "am", "get", "got", "gets", "getting", "going", "go", "goes", "went"
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "dare",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "again",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "and",
+        "but",
+        "if",
+        "or",
+        "because",
+        "until",
+        "while",
+        "about",
+        "against",
+        "i",
+        "me",
+        "my",
+        "myself",
+        "we",
+        "our",
+        "ours",
+        "ourselves",
+        "you",
+        "your",
+        "yours",
+        "yourself",
+        "yourselves",
+        "he",
+        "him",
+        "his",
+        "himself",
+        "she",
+        "her",
+        "hers",
+        "herself",
+        "it",
+        "its",
+        "itself",
+        "they",
+        "them",
+        "their",
+        "theirs",
+        "themselves",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "this",
+        "that",
+        "these",
+        "those",
+        "am",
+        "get",
+        "got",
+        "gets",
+        "getting",
+        "going",
+        "go",
+        "goes",
+        "went",
     }
 
     def __init__(
@@ -68,7 +183,7 @@ class MandelbrotWeighting:
         max_weight: float = 5.0,
         use_stopwords: bool = True,
         custom_stopwords: Optional[set] = None,
-        corpus_path: Optional[str] = None
+        corpus_path: Optional[str] = None,
     ):
         """
         Initialize the Mandelbrot weighting system.
@@ -115,7 +230,7 @@ class MandelbrotWeighting:
         alpha: Optional[float] = None,
         beta: Optional[float] = None,
         min_weight: Optional[float] = None,
-        max_weight: Optional[float] = None
+        max_weight: Optional[float] = None,
     ):
         """
         Adjust tuning parameters at runtime.
@@ -158,7 +273,7 @@ class MandelbrotWeighting:
             List of lowercase word tokens
         """
         # Simple word tokenization - extract alphanumeric sequences
-        words = re.findall(r'\b[a-zA-Z]+\b', text.lower())
+        words = re.findall(r"\b[a-zA-Z]+\b", text.lower())
         return words
 
     def update_corpus(self, text: str):
@@ -293,10 +408,7 @@ class MandelbrotWeighting:
         return [(word, self.compute_weight(word)) for word in words]
 
     def weighted_word_score(
-        self,
-        text: str,
-        target_words: list[str],
-        normalize: bool = True
+        self, text: str, target_words: list[str], normalize: bool = True
     ) -> float:
         """
         Compute weighted score for presence of target words in text.
@@ -331,10 +443,7 @@ class MandelbrotWeighting:
         return matched_weight
 
     def weighted_sentiment_score(
-        self,
-        text: str,
-        positive_words: list[str],
-        negative_words: list[str]
+        self, text: str, positive_words: list[str], negative_words: list[str]
     ) -> float:
         """
         Compute weighted sentiment score.
@@ -432,10 +541,10 @@ class MandelbrotWeighting:
             "max_weight": self.max_weight,
             "total_words": self.total_words,
             "frequencies": dict(self.word_frequencies.most_common(10000)),  # Top 10k
-            "domain_boosts": self.domain_boost_words
+            "domain_boosts": self.domain_boost_words,
         }
 
-        with open(save_path, 'w') as f:
+        with open(save_path, "w") as f:
             json.dump(data, f, indent=2)
 
     def _load_corpus(self):
@@ -474,7 +583,7 @@ class MandelbrotWeighting:
             "corpus_size": self.total_words,
             "unique_words": len(self.word_frequencies),
             "domain_boost_count": len(self.domain_boost_words),
-            "stopword_count": len(self.stopwords)
+            "stopword_count": len(self.stopwords),
         }
 
     def explain_weight(self, word: str) -> dict:
@@ -500,8 +609,5 @@ class MandelbrotWeighting:
             "is_stopword": word in self.stopwords,
             "has_domain_boost": word in self.domain_boost_words,
             "domain_boost": self.domain_boost_words.get(word, 1.0),
-            "params": {
-                "alpha": self.alpha,
-                "beta": self.beta
-            }
+            "params": {"alpha": self.alpha, "beta": self.beta},
         }

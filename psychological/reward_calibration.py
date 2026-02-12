@@ -19,7 +19,7 @@ class RewardCalibrationModule:
         memory,
         predictive_dreaming,
         assurance_module,
-        target_flow_range: tuple[float, float] = (0.4, 0.7)
+        target_flow_range: tuple[float, float] = (0.4, 0.7),
     ):
         self.emotion = emotion_regulator
         self.memory = memory
@@ -57,15 +57,15 @@ class RewardCalibrationModule:
         signals["uncertainty"] = recent_uncertainty
 
         # 3. Context load — use memory's current_turn as proxy for complexity
-        turn_count = getattr(self.memory, 'current_turn', 0)
+        turn_count = getattr(self.memory, "current_turn", 0)
         context_ratio = min(turn_count / 50.0, 1.0)
         signals["context_load"] = context_ratio
 
         # Weighted aggregate
         difficulty = (
-            0.4 * signals["predictive"] +
-            0.4 * signals["uncertainty"] +
-            0.2 * signals["context_load"]
+            0.4 * signals["predictive"]
+            + 0.4 * signals["uncertainty"]
+            + 0.2 * signals["context_load"]
         )
 
         return difficulty, signals
@@ -74,8 +74,7 @@ class RewardCalibrationModule:
         """Update moving average and apply calibration adjustments."""
         # Exponential moving average
         self.difficulty_moving_avg = (
-            self.alpha * difficulty +
-            (1 - self.alpha) * self.difficulty_moving_avg
+            self.alpha * difficulty + (1 - self.alpha) * self.difficulty_moving_avg
         )
 
         # Track history
@@ -96,9 +95,7 @@ class RewardCalibrationModule:
                 1.0, self.creativity_temperature + 0.1 * flow_deviation
             )
             self.exploration_bonus += 0.1 * flow_deviation
-            self.persistence_factor = max(
-                1.3, self.persistence_factor + 0.15 * flow_deviation
-            )
+            self.persistence_factor = max(1.3, self.persistence_factor + 0.15 * flow_deviation)
 
         elif self.difficulty_moving_avg > self.target_max:
             # Too hard → overload risk
@@ -109,12 +106,8 @@ class RewardCalibrationModule:
             self.creativity_temperature = max(
                 0.3, self.creativity_temperature - 0.1 * flow_deviation
             )
-            self.persistence_factor = min(
-                0.7, self.persistence_factor - 0.15 * flow_deviation
-            )
-            self.rejection_threshold = min(
-                0.95, self.rejection_threshold + 0.05 * flow_deviation
-            )
+            self.persistence_factor = min(0.7, self.persistence_factor - 0.15 * flow_deviation)
+            self.rejection_threshold = min(0.95, self.rejection_threshold + 0.05 * flow_deviation)
 
         else:
             # In flow
@@ -129,7 +122,7 @@ class RewardCalibrationModule:
         self.emotion.apply_reward_signal(
             valence=flow_reward * 0.6,
             label=f"flow_state_{adjustment_label}",
-            intensity=flow_reward * 0.5
+            intensity=flow_reward * 0.5,
         )
 
         return {
@@ -139,7 +132,7 @@ class RewardCalibrationModule:
             "temperature": self.creativity_temperature,
             "persistence": self.persistence_factor,
             "rejection_threshold": self.rejection_threshold,
-            "should_suggest_simplification": difficulty > self.rejection_threshold
+            "should_suggest_simplification": difficulty > self.rejection_threshold,
         }
 
     def run_cycle(self) -> dict:
@@ -149,8 +142,7 @@ class RewardCalibrationModule:
 
         # Log
         self.memory.store_episodic(
-            event="flow_calibration",
-            content=calibration_state | {"signals": signals}
+            event="flow_calibration", content=calibration_state | {"signals": signals}
         )
 
         return calibration_state

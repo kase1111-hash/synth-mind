@@ -12,8 +12,7 @@ def setup_logging(log_level: str = "INFO", log_file: str = None):
 
     # Create formatter
     formatter = logging.Formatter(
-        '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     # Console handler
@@ -37,9 +36,10 @@ def setup_logging(log_level: str = "INFO", log_file: str = None):
         root_logger.addHandler(file_handler)
 
     # Suppress noisy libraries
-    logging.getLogger('httpx').setLevel(logging.WARNING)
-    logging.getLogger('httpcore').setLevel(logging.WARNING)
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 
 def get_logger(name: str) -> logging.Logger:
     """Get a logger instance."""

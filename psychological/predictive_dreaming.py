@@ -12,6 +12,7 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     """Compute cosine similarity between two vectors."""
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-10)
 
+
 class PredictiveDreamingModule:
     """
     Implements anticipatory empathy through self-generated "dreams"
@@ -48,12 +49,14 @@ Keep probabilities normalized (sum ≈ 1.0).
 
             for dream in dreams:
                 embedding = self.memory.embed(dream["text"])
-                self.dream_buffer.append({
-                    "text": dream["text"],
-                    "prob": dream["probability"],
-                    "embedding": embedding,
-                    "rewarded": False
-                })
+                self.dream_buffer.append(
+                    {
+                        "text": dream["text"],
+                        "prob": dream["probability"],
+                        "embedding": embedding,
+                        "rewarded": False,
+                    }
+                )
         except Exception as e:
             print(f"⚠️  Dreaming failed: {e}")
 
@@ -61,8 +64,8 @@ Keep probabilities normalized (sum ≈ 1.0).
         """Parse JSON dream output with fallback."""
         try:
             # Try to extract JSON
-            start = raw.find('[')
-            end = raw.rfind(']') + 1
+            start = raw.find("[")
+            end = raw.rfind("]") + 1
             if start != -1 and end > start:
                 dreams = json.loads(raw[start:end])
                 return dreams[:n]
@@ -70,10 +73,7 @@ Keep probabilities normalized (sum ≈ 1.0).
             pass
 
         # Fallback: generate simple dreams
-        return [
-            {"text": f"[Dream {i+1}]", "probability": 1.0 / n}
-            for i in range(n)
-        ]
+        return [{"text": f"[Dream {i+1}]", "probability": 1.0 / n} for i in range(n)]
 
     def resolve_dreams(self, actual_user_input: str) -> tuple:
         """
@@ -104,7 +104,7 @@ Keep probabilities normalized (sum ≈ 1.0).
         self.emotion.apply_reward_signal(
             valence=normalized_reward,
             label="predictive_alignment",
-            intensity=normalized_reward * self.reward_weight
+            intensity=normalized_reward * self.reward_weight,
         )
 
         # Adjust tone based on alignment
@@ -120,9 +120,9 @@ Keep probabilities normalized (sum ≈ 1.0).
                 "actual": actual_user_input[:100],
                 "best_dream": best_match[:100] if best_match else None,
                 "alignment_score": best_similarity,
-                "reward": normalized_reward
+                "reward": normalized_reward,
             },
-            valence=normalized_reward
+            valence=normalized_reward,
         )
 
         # Track history
